@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>黑神话：悟空 - 探索版</title>
+  <title>哈悟空</title>
   <style>
     * {
       margin: 0;
@@ -207,10 +207,121 @@
     button:hover {
       background: #c94438;
     }
+
+    /* ---------- 移动端横屏触屏 ---------- */
+    #rotate-tip {
+      display: none;
+    }
+
+    #touch-ui {
+      display: none;
+    }
+
+    body.touch #touch-ui {
+      display: block;
+    }
+
+    /* 竖屏时提示横屏 */
+    @media (orientation: portrait) {
+      body.touch #rotate-tip {
+        display: flex;
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(10, 8, 6, 0.92);
+        color: #ffd700;
+        font-size: 22px;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      body.touch #touch-ui {
+        display: none;
+      }
+    }
+
+    /* 左侧虚拟摇杆 */
+    #joy-zone {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      width: 45%;
+      height: 60%;
+      z-index: 20;
+    }
+
+    #joy-base {
+      position: absolute;
+      left: 40px;
+      bottom: 60px;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.35);
+      border: 2px solid rgba(212, 175, 55, 0.6);
+    }
+
+    #joy-knob {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(212, 175, 55, 0.85);
+      transform: translate(-50%, -50%);
+    }
+
+    /* 右侧按钮区 */
+    #touch-btns {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 20;
+      display: grid;
+      grid-template-columns: repeat(3, 62px) 84px;
+      grid-auto-rows: 62px;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .tbtn {
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid #d4af37;
+      color: #e8d9a8;
+      font-size: 14px;
+      font-weight: bold;
+      padding: 0;
+    }
+
+    .tbtn:active {
+      background: rgba(212, 175, 55, 0.6);
+    }
+
+    #btn-attack {
+      grid-row: span 2;
+      width: 84px;
+      height: 84px;
+      font-size: 18px;
+      background: rgba(163, 53, 44, 0.7);
+      border-color: #ff8a5c;
+      color: #fff;
+    }
+
+    /* 小屏压缩 HUD */
+    @media (max-height: 500px) {
+      h1 { font-size: 16px; top: 4px; }
+      #info { display: none; }
+      #score-board { top: 30px; font-size: 14px; }
+      #player-hp { top: 52px; width: 220px; height: 18px; }
+      #boss-hp { top: 76px; font-size: 13px; }
+      #skill-bar { display: none; }
+    }
   </style>
 </head>
 <body>
-  <h1>黑神话：悟空</h1>
+  <h1>哈悟空</h1>
   <div id="info">
     WASD 移动探索，空格长按蓄力、松开挥棒（越久伤害越高），J / 点击快速挥棒，Shift 闪避<br/>
     Q 切换棍式（劈 / 立 / 戳）· 技能：1 定身术 · 2 横扫六合 · 3 火眼金睛 · 4 广智变身 · 找到并击败黑风大王！
@@ -232,6 +343,24 @@
       <div class="skill" id="skill-pearl" style="display:none"><span class="key">5</span>定风珠<span class="cd"></span></div>
       <div class="skill" id="slot-sober" style="display:none"><span class="key">石</span>醒酒石</div>
       <div class="skill" id="skill-mantle" style="display:none"><span class="key">宝</span>避火罩</div>
+    </div>
+  </div>
+
+  <div id="rotate-tip">请将设备横屏后游玩哈悟空</div>
+
+  <div id="touch-ui">
+    <div id="joy-zone">
+      <div id="joy-base"><div id="joy-knob"></div></div>
+    </div>
+    <div id="touch-btns">
+      <button class="tbtn" data-act="stance">棍式</button>
+      <button class="tbtn" data-act="freeze">定身</button>
+      <button class="tbtn" data-act="sweep">横扫</button>
+      <button class="tbtn" data-act="fire">火眼</button>
+      <button class="tbtn" data-act="transform">变身</button>
+      <button class="tbtn" data-act="pearl">定风</button>
+      <button class="tbtn" data-act="dodge">闪避</button>
+      <button class="tbtn" id="btn-attack">攻击</button>
     </div>
   </div>
 
@@ -1447,6 +1576,12 @@
           mx = 0;
           my = 0;
         }
+      }
+
+      // 移动端摇杆优先。
+      if (joy.active && (joy.dx !== 0 || joy.dy !== 0)) {
+        mx = joy.dx;
+        my = joy.dy;
       }
 
       if (mx !== 0 || my !== 0) {
@@ -4634,6 +4769,90 @@
     canvas.addEventListener('mousedown', () => {
       startSwing(1);
     });
+
+    // ---------- 移动端触屏 ----------
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) document.body.classList.add('touch');
+
+    const joy = { active: false, dx: 0, dy: 0 };
+    const joyZone = document.getElementById('joy-zone');
+    const joyBase = document.getElementById('joy-base');
+    const joyKnob = document.getElementById('joy-knob');
+    let joyTouchId = null;
+
+    function updateJoy(t) {
+      const rect = joyBase.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let dx = t.clientX - cx;
+      let dy = t.clientY - cy;
+      const max = 42;
+      const len = Math.hypot(dx, dy);
+      if (len > max) {
+        dx = dx / len * max;
+        dy = dy / len * max;
+      }
+      joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      joy.dx = len > 8 ? dx / max : 0;
+      joy.dy = len > 8 ? dy / max : 0;
+    }
+
+    joyZone.addEventListener('touchstart', (e) => {
+      const t = e.changedTouches[0];
+      joyTouchId = t.identifier;
+      joy.active = true;
+      updateJoy(t);
+      e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      for (const t of e.changedTouches) {
+        if (t.identifier === joyTouchId) updateJoy(t);
+      }
+    }, { passive: false });
+
+    function endJoy(e) {
+      for (const t of e.changedTouches) {
+        if (t.identifier === joyTouchId) {
+          joyTouchId = null;
+          joy.active = false;
+          joy.dx = 0;
+          joy.dy = 0;
+          joyKnob.style.transform = 'translate(-50%, -50%)';
+        }
+      }
+    }
+    window.addEventListener('touchend', endJoy);
+    window.addEventListener('touchcancel', endJoy);
+
+    // 攻击键：点按快速挥棒，长按蓄力。
+    const btnAttack = document.getElementById('btn-attack');
+    btnAttack.addEventListener('touchstart', (e) => {
+      startCharge();
+      e.preventDefault();
+    }, { passive: false });
+    btnAttack.addEventListener('touchend', (e) => {
+      releaseCharge();
+      e.preventDefault();
+    }, { passive: false });
+
+    // 其余功能键。
+    for (const btn of document.querySelectorAll('.tbtn[data-act]')) {
+      btn.addEventListener('touchstart', (e) => {
+        const act = btn.dataset.act;
+        if (act === 'stance') {
+          stanceIdx = (stanceIdx + 1) % STANCES.length;
+          stanceNameEl.textContent = STANCES[stanceIdx].name;
+        } else if (act === 'dodge') {
+          startDodge(player.moveDx || Math.cos(player.angle), player.moveDy || Math.sin(player.angle));
+        } else if (act === 'freeze') castFreeze();
+        else if (act === 'sweep') castSweep();
+        else if (act === 'fire') castFire();
+        else if (act === 'transform') castTransform();
+        else if (act === 'pearl') castPearl();
+        e.preventDefault();
+      }, { passive: false });
+    }
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
