@@ -476,6 +476,7 @@
     let icelakeTimer = 0;
     let huangmei = null;
     let ch3EndCountdown = 0;
+    let futuCountdown = 0;
     let score = 0;
     let kills = 0;
     let bossActive = false;
@@ -716,6 +717,65 @@
       if (pearlCountdown > 0 && --pearlCountdown === 0) exitSahali();
       if (introCountdown > 0 && --introCountdown === 0) startChapter3Intro();
       if (ch3EndCountdown > 0 && --ch3EndCountdown === 0) endChapter3();
+      if (futuCountdown > 0 && --futuCountdown === 0) enterFutu();
+    }
+
+    // 浮屠界：魔将妙音镇守的终极战场。
+    function spawnMiaoyin() {
+      enemies.push({
+        type: 'miaoyin',
+        name: '魔将妙音',
+        x: WORLD.w / 2,
+        y: 420,
+        radius: 44,
+        hp: 2400,
+        maxHp: 2400,
+        dmg: 46,
+        speed: 1.15,
+        aggro: 9999,
+        isBoss: true,
+        atk: 'melee',
+        atkCycle: ['melee', 'aoe', 'ranged'],
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'chase',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0
+      });
+      bossActive = true;
+    }
+
+    function enterFutu() {
+      currentMap = 'futu';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      huangmei = null;
+      checkpoint = { map: 'futu' };
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 260;
+      player.hp = player.maxHp;
+      for (let i = 0; i < 3; i++) {
+        peaches.push({
+          x: randomRange(300, WORLD.w - 300),
+          y: randomRange(500, WORLD.h - 300),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      spawnMiaoyin();
+      banner = { text: '浮屠界 · 魔将妙音', timer: 170 };
+      updateUI();
     }
 
     // 第三章开场：雪原直路 → 遇小西天土地 → 化蝠飞往小西天。
@@ -793,9 +853,9 @@
 
     function endChapter3() {
       gameRunning = false;
-      overlayTitle.textContent = '第三章 · 冰湖';
-      overlayTitle.style.color = '#9fd8ff';
-      overlayMsg.textContent = `你击败了亢金龙，第三章完！敬请期待后续。最终得分: ${score}`;
+      overlayTitle.textContent = '第三章 · 功德圆满';
+      overlayTitle.style.color = '#ffd700';
+      overlayMsg.textContent = `你击败了魔将·妙音，第三章完！敬请期待后续。最终得分: ${score}`;
       overlay.style.display = 'block';
     }
 
@@ -1214,6 +1274,7 @@
       icelakeTimer = 0;
       huangmei = null;
       ch3EndCountdown = 0;
+      futuCountdown = 0;
       document.getElementById('slot-sober').style.display = 'none';
       document.getElementById('skill-pearl').style.display = 'none';
       player.hasMantle = false;
@@ -1348,8 +1409,15 @@
             return false;
           }
           if (e.name === '亢金龙') {
-            // 第三章 BOSS 已灭。
-            banner = { text: '亢金龙已灭！', timer: 150 };
+            // 亢金龙已灭，赤尻马猴现身掳人。
+            banner = { text: '亢金龙已灭！赤尻马猴将你掳走了……', timer: 180 };
+            futuCountdown = 210;
+            updateUI();
+            return false;
+          }
+          if (e.name === '魔将妙音') {
+            // 第三章最终 BOSS 已灭。
+            banner = { text: '魔将妙音已灭！', timer: 150 };
             ch3EndCountdown = 190;
             updateUI();
             return false;
@@ -1841,6 +1909,45 @@
     // ---------- 绘制 ----------
 
     function drawGround() {
+      if (currentMap === 'futu') {
+        // 浮屠界：暗色塔底石地，岩浆裂缝泛红。
+        ctx.fillStyle = '#241f2a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // 石板。
+        ctx.strokeStyle = 'rgba(80, 70, 95, 0.4)';
+        ctx.lineWidth = 2;
+        const tile3 = 110;
+        const ox3 = -(camera.x % tile3);
+        const oy3 = -(camera.y % tile3);
+        ctx.beginPath();
+        for (let x = ox3; x < canvas.width; x += tile3) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+        }
+        for (let y = oy3; y < canvas.height; y += tile3) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+        // 岩浆裂缝（微光）。
+        for (let i = 0; i < 40; i++) {
+          const gx = seeded(i + 13500) * WORLD.w;
+          const gy = seeded(i + 13900) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) continue;
+          const glow = 0.25 + Math.sin(frameCount * 0.06 + i) * 0.12;
+          ctx.strokeStyle = `rgba(255, 90, 30, ${glow})`;
+          ctx.lineWidth = 2.5;
+          const a = seeded(i + 14300) * Math.PI;
+          ctx.beginPath();
+          ctx.moveTo(sx - 26 * Math.cos(a), sy - 26 * Math.sin(a));
+          ctx.lineTo(sx + 26 * Math.cos(a), sy + 26 * Math.sin(a));
+          ctx.stroke();
+        }
+        return;
+      }
+
       if (currentMap === 'icelake') {
         // 冰湖：蓝白冰面，裂纹纵横，远处雪山。
         ctx.fillStyle = '#b8d4e4';
@@ -2077,6 +2184,36 @@
     }
 
     function drawDecor() {
+      if (currentMap === 'futu') {
+        // 浮屠界：暗红塔柱与幽暗灯笼。
+        const pillars = [];
+        for (let i = 0; i < 6; i++) {
+          pillars.push([WORLD.w / 2 - 500 + (i % 3) * 500, i < 3 ? 420 : 1180]);
+        }
+        for (const [px, py] of pillars) {
+          const sx = px - camera.x;
+          const sy = py - camera.y;
+          if (sx < -80 || sy < -160 || sx > canvas.width + 80 || sy > canvas.height + 80) continue;
+          ctx.fillStyle = 'rgba(0,0,0,0.3)';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy + 4, 26, 9, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#4a2430';
+          ctx.fillRect(sx - 16, sy - 130, 32, 130);
+          ctx.fillStyle = '#6e3444';
+          ctx.fillRect(sx - 20, sy - 142, 40, 14);
+          ctx.fillRect(sx - 20, sy - 8, 40, 10);
+          // 灯笼。
+          ctx.fillStyle = `rgba(255, 120, 60, ${0.7 + Math.sin(frameCount * 0.1 + px) * 0.2})`;
+          ctx.shadowColor = '#ff6a2a';
+          ctx.shadowBlur = 12;
+          ctx.beginPath();
+          ctx.ellipse(sx, sy - 155, 9, 12, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+        return;
+      }
       if (currentMap === 'icelake') {
         // 冰湖：冰锥与雪石。
         for (const r of decor.rocks) {
@@ -3396,6 +3533,115 @@
       ctx.strokeRect(bx, by, barWidth, 8);
     }
 
+    // 魔将妙音：巨婴般的魔将——硕大头颅、佛珠、圆滚身躯。
+    function drawMiaoyin(e, sx, sy) {
+      const u = e.radius * 1.15;
+      const bob = Math.sin(frameCount * 0.06) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.5, u * 2.1);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.3, u * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 短腿。
+      ctx.fillStyle = '#8a7a72';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.4, -u * 0.3, u * 0.28, u * 0.34, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.4, -u * 0.3, u * 0.28, u * 0.34, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 圆滚身躯。
+      const body = ctx.createRadialGradient(-u * 0.2, -u * 1.6, u * 0.2, 0, -u * 1.1, u * 1.3);
+      body.addColorStop(0, '#b8a8a0');
+      body.addColorStop(1, '#7a6a62');
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.15, u * 1.1, u * 1.0, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 佛珠项链。
+      ctx.fillStyle = '#5c3a20';
+      for (let i = -3; i <= 3; i++) {
+        ctx.beginPath();
+        ctx.arc(i * u * 0.22, -u * 1.75 + Math.abs(i) * u * 0.06, u * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 粗壮手臂。
+      ctx.fillStyle = '#8a7a72';
+      ctx.beginPath();
+      ctx.ellipse(-u * 1.05, -u * 1.2, u * 0.3, u * 0.65, 0.25, 0, Math.PI * 2);
+      ctx.ellipse(u * 1.05, -u * 1.2, u * 0.3, u * 0.65, -0.25, 0, Math.PI * 2);
+      ctx.fill();
+      // 拳头。
+      ctx.fillStyle = '#7a6a62';
+      ctx.beginPath();
+      ctx.arc(-u * 1.2, -u * 0.6, u * 0.3, 0, Math.PI * 2);
+      ctx.arc(u * 1.2, -u * 0.6, u * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 硕大头颅。
+      ctx.fillStyle = '#c8b8b0';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.6, u * 0.68, 0, Math.PI * 2);
+      ctx.fill();
+      // 佛痣与闭目。
+      ctx.fillStyle = '#a31515';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.85, u * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#3a2a24';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.32, -u * 2.62);
+      ctx.quadraticCurveTo(-u * 0.2, -u * 2.56, -u * 0.08, -u * 2.62);
+      ctx.moveTo(u * 0.08, -u * 2.62);
+      ctx.quadraticCurveTo(u * 0.2, -u * 2.56, u * 0.32, -u * 2.62);
+      ctx.stroke();
+      // 诡异笑嘴。
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.35, u * 0.2, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+
+      // 魔气环绕。
+      ctx.strokeStyle = `rgba(150, 80, 200, ${0.3 + Math.sin(frameCount * 0.08) * 0.12})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, -u * 1.4, u * 1.5, frameCount * 0.03, frameCount * 0.03 + 1.8);
+      ctx.stroke();
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.4, u * 1.4, u * 1.9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.8;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.9;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
     // 黄袍员外：醉卧的猪 NPC（原点为脚底）。
     function drawPigNpc() {
       if (!pigNpc) return;
@@ -4104,6 +4350,7 @@
         else if (e.type === 'huangfeng') drawHuangfengBoss(e, sx, sy);
         else if (e.type === 'fuban') drawFuban(e, sx, sy);
         else if (e.type === 'kanglong') drawKanglong(e, sx, sy);
+        else if (e.type === 'miaoyin') drawMiaoyin(e, sx, sy);
         else if (e.type === 'shaguo') drawShaguo(e, sx, sy);
         else if (e.type === 'shixian') drawShixian(e, sx, sy);
         else if (e.type === 'huxian') drawHuxian(e, sx, sy);
@@ -4723,6 +4970,14 @@
         overlay.style.display = 'none';
         enterIcelake();
         banner = { text: '于冰湖存档点复活', timer: 140 };
+        gameRunning = true;
+        gameLoop();
+        return;
+      }
+      if (checkpoint && checkpoint.map === 'futu' && currentMap === 'futu') {
+        overlay.style.display = 'none';
+        enterFutu();
+        banner = { text: '于浮屠界存档点复活', timer: 140 };
         gameRunning = true;
         gameLoop();
         return;
