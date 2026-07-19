@@ -1,0 +1,3530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>黑神话：悟空 - 探索版</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d0a08;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    h1 {
+      position: absolute;
+      top: 8px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 24px;
+      letter-spacing: 6px;
+      color: #d4af37;
+      text-shadow: 0 0 12px rgba(212, 175, 55, 0.5);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #info {
+      position: absolute;
+      top: 42px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: #e8d9a8;
+      font-size: 13px;
+      line-height: 1.6;
+      text-shadow: 0 1px 3px #000;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #score-board {
+      position: absolute;
+      top: 98px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffd700;
+      text-shadow: 0 1px 3px #000;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #player-hp {
+      position: absolute;
+      top: 126px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 24px;
+      overflow: hidden;
+      border: 2px solid #d4af37;
+      border-radius: 7px;
+      background: #2a1a10;
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+      text-align: center;
+      z-index: 2;
+    }
+
+    #player-hp-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 100%;
+      background: linear-gradient(90deg, #c0392b, #d4af37);
+      transition: width 0.2s ease;
+    }
+
+    #player-hp-text {
+      position: relative;
+      z-index: 1;
+      line-height: 20px;
+      text-shadow: 0 1px 2px #000;
+    }
+
+    #boss-hp {
+      position: absolute;
+      top: 158px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 16px;
+      font-weight: bold;
+      color: #e74c3c;
+      text-shadow: 0 1px 3px #000;
+      display: none;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #stage {
+      position: static;
+    }
+
+    #skill-bar {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .skill {
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid #d4af37;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: #e8d9a8;
+      min-width: 92px;
+      text-align: center;
+    }
+
+    .skill .key {
+      display: inline-block;
+      background: #d4af37;
+      color: #1a1208;
+      border-radius: 4px;
+      padding: 0 5px;
+      margin-right: 5px;
+      font-weight: bold;
+    }
+
+    .skill .cd {
+      color: #ff8a5c;
+      font-weight: bold;
+      margin-left: 5px;
+    }
+
+    .skill.on-cd {
+      opacity: 0.45;
+    }
+
+    .skill.active {
+      opacity: 1;
+      border-color: #ff8a3a;
+      color: #ffcf9a;
+      box-shadow: 0 0 10px rgba(255, 122, 42, 0.5);
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      display: block;
+      background: #6b8f40;
+      cursor: crosshair;
+    }
+
+    #overlay {
+      position: fixed;
+      z-index: 10;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      background: rgba(0, 0, 0, 0.88);
+      padding: 30px 40px;
+      border-radius: 12px;
+      border: 1px solid #d4af37;
+      display: none;
+    }
+
+    #overlay h2 {
+      margin-bottom: 12px;
+      color: #d4af37;
+    }
+
+    #overlay p {
+      margin-bottom: 20px;
+      color: #ccc;
+    }
+
+    button {
+      padding: 10px 24px;
+      font-size: 16px;
+      background: #a3352c;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #c94438;
+    }
+  </style>
+</head>
+<body>
+  <h1>黑神话：悟空</h1>
+  <div id="info">
+    WASD 移动探索，空格长按蓄力、松开挥棒（越久伤害越高），J / 点击快速挥棒，Shift 闪避<br/>
+    Q 切换棍式（劈 / 立 / 戳）· 技能：1 定身术 · 2 横扫六合 · 3 火眼金睛 · 4 广智变身 · 找到并击败黑风大王！
+  </div>
+  <div id="score-board">得分: 0 | 击杀: 0</div>
+  <div id="player-hp">
+    <div id="player-hp-fill"></div>
+    <span id="player-hp-text">生命值: 300/300</span>
+  </div>
+  <div id="boss-hp">黑风大王 HP: 800/800</div>
+  <div id="stage">
+    <canvas id="game" width="800" height="600"></canvas>
+    <div id="skill-bar">
+      <div class="skill"><span class="key">Q</span><span id="stance-name">劈棍</span></div>
+      <div class="skill" id="skill-freeze"><span class="key">1</span>定身术<span class="cd"></span></div>
+      <div class="skill" id="skill-sweep"><span class="key">2</span>横扫六合<span class="cd"></span></div>
+      <div class="skill" id="skill-fire"><span class="key">3</span>火眼金睛<span class="cd"></span></div>
+      <div class="skill" id="skill-transform"><span class="key">4</span>广智变身<span class="cd"></span></div>
+      <div class="skill" id="skill-mantle" style="display:none"><span class="key">宝</span>避火罩</div>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <h2 id="overlay-title">游戏结束</h2>
+    <p id="overlay-msg">最终得分: 0</p>
+    <button onclick="restartGame()">重新开始</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score-board');
+    const playerHpTextEl = document.getElementById('player-hp-text');
+    const playerHpFillEl = document.getElementById('player-hp-fill');
+    const bossHpEl = document.getElementById('boss-hp');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMsg = document.getElementById('overlay-msg');
+
+    // 世界尺寸（远大于屏幕，镜头跟随玩家）。
+    const WORLD = { w: 2400, h: 1800 };
+    const HEAL_AMOUNT = 50;
+    const BOSS_HP = 800;
+
+    const keys = {};
+    const camera = { x: 0, y: 0 };
+
+    const player = {
+      x: WORLD.w / 2,
+      y: WORLD.h / 2 + 300,
+      r: 16,
+      speed: 3.2,
+      angle: -Math.PI / 2,
+      moving: false,
+      walkPhase: 0,
+      facing: 1,
+      moveDx: 0,
+      moveDy: 0,
+      hp: 300,
+      maxHp: 300,
+      hurtCooldown: 0,
+      maxHurtCooldown: 45,
+      empowered: false,
+      hasMantle: false
+    };
+
+    const staff = {
+      swinging: false,
+      timer: 0,
+      duration: 14,
+      cooldown: 0
+    };
+
+    // 棍式：劈棍过顶劈落、立棍拄棍砸落点、戳棍拧身疾刺。
+    const STANCES = [
+      { name: '劈棍', kind: 'chop', dmg: 1.2, range: 130, arc: 0.6, cd: 24 },
+      { name: '立棍', kind: 'vault', dmg: 1.5, range: 120, radius: 125, cd: 36 },
+      { name: '戳棍', kind: 'thrust', dmg: 1.35, range: 195, width: 46, cd: 18 }
+    ];
+    let stanceIdx = 0;
+    const stanceNameEl = document.getElementById('stance-name');
+    const combo = { count: 0, timer: 0, window: 100 };
+    const dodge = { active: false, timer: 0, duration: 12, dx: 0, dy: 0, cooldown: 0, maxCooldown: 42 };
+    // 蓄力：空格长按，松开释放，最高 3 倍伤害。
+    const charge = { charging: false, level: 0, max: 90 };
+
+    const FREEZE_DURATION = 180;
+    const skills = {
+      freeze: { cd: 0, maxCd: 720, el: document.getElementById('skill-freeze') },
+      sweep: { cd: 0, maxCd: 480, el: document.getElementById('skill-sweep') },
+      fire: { cd: 0, maxCd: 900, el: document.getElementById('skill-fire') },
+      transform: { cd: 0, maxCd: 1500, el: document.getElementById('skill-transform') }
+    };
+    // 广智变身：化为狼战士，攻击翻倍、移动加速，持续一分钟且期间无敌。
+    const transform = { active: false, timer: 0, duration: 3600, dmgMult: 2, speedMult: 1.3 };
+    let skillFx = [];
+
+      // 小怪图鉴：不同血量和习性，攻击方式各异。
+    const ENEMY_TYPES = {
+      wolf: { name: '狼妖', hp: 40, dmg: 10, speed: 1.6, radius: 20, aggro: 260, score: 20, atk: 'lunge' },
+      snake: { name: '蛇妖', hp: 25, dmg: 8, speed: 2.4, radius: 14, aggro: 240, score: 15, atk: 'ranged' },
+      golem: { name: '石精', hp: 90, dmg: 16, speed: 0.8, radius: 26, aggro: 210, score: 30, atk: 'aoe' },
+      rat: { name: '鼠妖', hp: 30, dmg: 9, speed: 2.2, radius: 15, aggro: 250, score: 18, atk: 'ranged' }
+    };
+
+    let enemies = [];
+    let peaches = [];
+    let particles = [];
+    let slashes = [];
+    let damageTexts = [];
+    let decor = { trees: [], rocks: [], flowers: [] };
+    let bells = [];
+    let bellsRung = 0;
+    let currentMap = 'forest';
+    let forestState = null;
+    let banner = null;
+    let templeCountdown = 0;
+    let returnCountdown = 0;
+    let chapterCountdown = 0;
+    let checkpoint = null;
+    let score = 0;
+    let kills = 0;
+    let bossActive = false;
+    let gameRunning = true;
+    let frameCount = 0;
+
+    function randomRange(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    // 确定性伪随机：让草木装饰位置每帧固定。
+    function seeded(i) {
+      const v = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+      return v - Math.floor(v);
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function angleDiff(a, b) {
+      let d = a - b;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      return d;
+    }
+
+    function rollDamage() {
+      return Math.floor(randomRange(20, 31));
+    }
+
+    function spawnEnemy(type, x, y) {
+      const t = ENEMY_TYPES[type];
+      enemies.push({
+        type,
+        x,
+        y,
+        radius: t.radius,
+        hp: t.hp,
+        maxHp: t.hp,
+        dmg: t.dmg,
+        speed: t.speed,
+        aggro: t.aggro,
+        score: t.score,
+        isBoss: false,
+        atk: t.atk,
+        atkCycle: null,
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'idle',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: randomRange(0, Math.PI * 2)
+      });
+    }
+
+    function spawnBoss() {
+      enemies.push({
+        type: 'boss',
+        name: '黑风大王',
+        x: WORLD.w - 450,
+        y: 400,
+        radius: 34,
+        hp: BOSS_HP,
+        maxHp: BOSS_HP,
+        dmg: 40,
+        speed: 1.3,
+        aggro: 340,
+        isBoss: true,
+        atk: 'melee',
+        atkCycle: ['melee', 'lunge'],
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'idle',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0
+      });
+    }
+
+    // 旧观音禅院的 BOSS：金池长老。
+    function spawnJinchi() {
+      enemies.push({
+        type: 'jinchi',
+        name: '金池长老',
+        x: WORLD.w / 2,
+        y: 560,
+        radius: 30,
+        hp: 1200,
+        maxHp: 1200,
+        dmg: 30,
+        speed: 1.25,
+        aggro: 9999,
+        isBoss: true,
+        atk: 'melee',
+        atkCycle: ['melee', 'ranged'],
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'chase',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0
+      });
+      bossActive = true;
+    }
+
+    // 第一口钟藏山野：随机放三口钟，彼此远离、离出生点和黑风大王也远。
+    function spawnBells() {
+      bells = [];
+      bellsRung = 0;
+      for (let i = 0; i < 3; i++) {
+        let x, y, ok;
+        do {
+          x = randomRange(220, WORLD.w - 220);
+          y = randomRange(220, WORLD.h - 220);
+          ok = Math.hypot(x - player.x, y - player.y) > 550
+            && Math.hypot(x - (WORLD.w - 450), y - 400) > 350
+            && bells.every(b => Math.hypot(b.x - x, b.y - y) > 450);
+        } while (!ok);
+        bells.push({ x, y, rung: false, swing: 0 });
+      }
+    }
+
+    function ringBell(b) {
+      b.rung = true;
+      b.swing = 1;
+      bellsRung++;
+      createDamageText(b.x, b.y - 80, '铛——', '#ffd700');
+      createParticles(b.x, b.y - 30, '#ffd700', 16);
+      skillFx.push({ type: 'ring', x: b.x, y: b.y - 30, life: 1 });
+      if (bellsRung >= 3) {
+        banner = { text: '三口钟已敲响！前往旧观音禅院……', timer: 150 };
+        templeCountdown = 140;
+      }
+      updateUI();
+    }
+
+    // 攻击命中判定附带敲钟（挥棒和横扫六合都能敲）。
+    function tryRingBells(range, arc, angle) {
+      if (currentMap !== 'forest') return;
+      for (const b of bells) {
+        if (b.rung) continue;
+        const dx = b.x - player.x;
+        const dy = b.y - player.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > range + 26) continue;
+        if (arc && Math.abs(angleDiff(Math.atan2(dy, dx), angle)) > arc / 2) continue;
+        ringBell(b);
+      }
+    }
+
+    // 以任意点为中心的敲钟判定（立棍落点用）。
+    function tryRingBellsAt(x, y, radius) {
+      if (currentMap !== 'forest') return;
+      for (const b of bells) {
+        if (b.rung) continue;
+        if (Math.hypot(b.x - x, b.y - y) > radius + 26) continue;
+        ringBell(b);
+      }
+    }
+
+    function enterTemple() {
+      forestState = { enemies, peaches, px: player.x, py: player.y };
+      currentMap = 'temple';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      for (let i = 0; i < 3; i++) {
+        peaches.push({
+          x: randomRange(300, WORLD.w - 300),
+          y: randomRange(700, WORLD.h - 300),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 280;
+      spawnJinchi();
+      banner = { text: '旧观音禅院', timer: 150 };
+      updateUI();
+    }
+
+    function exitTemple() {
+      currentMap = 'forest';
+      enemies = forestState.enemies;
+      peaches = forestState.peaches;
+      player.x = forestState.px;
+      player.y = forestState.py;
+      bossActive = enemies.some(e => e.isBoss && e.state !== 'idle');
+      forestState = null;
+      banner = { text: '获得法宝【避火罩】，回到了黑风山', timer: 170 };
+      updateUI();
+    }
+
+    function updateBells() {
+      for (const b of bells) {
+        if (b.swing > 0.01) b.swing *= 0.985;
+      }
+      if (banner && --banner.timer <= 0) banner = null;
+      if (templeCountdown > 0 && --templeCountdown === 0) enterTemple();
+      if (returnCountdown > 0 && --returnCountdown === 0) exitTemple();
+      if (chapterCountdown > 0 && --chapterCountdown === 0) enterHuangfeng();
+      if (nextBossCountdown > 0 && --nextBossCountdown === 0) {
+        chapter2BossIdx++;
+        spawnChapterBoss();
+      }
+    }
+
+
+    // 第二章 BOSS 连战顺序：沙国王父子 → 石先锋 → 虎先锋 → 黄风大圣。
+    const CHAPTER2_BOSSES = [
+      { type: 'shaguo', name: '沙国王父子', hp: 900, dmg: 26, speed: 1.4, radius: 28, aggro: 380, atkCycle: ['melee', 'ranged'] },
+      { type: 'shixian', name: '石先锋', hp: 1100, dmg: 32, speed: 0.9, radius: 36, aggro: 380, atkCycle: ['melee', 'aoe'] },
+      { type: 'huxian', name: '虎先锋', hp: 1300, dmg: 34, speed: 1.7, radius: 30, aggro: 420, atkCycle: ['melee', 'lunge'] },
+      { type: 'huangfeng', name: '黄风大圣', hp: 1500, dmg: 35, speed: 1.5, radius: 32, aggro: 420, atkCycle: ['melee', 'ranged'] }
+    ];
+    let chapter2BossIdx = 0;
+    let nextBossCountdown = 0;
+
+    // 场上同时只有一个 BOSS：按队列生成当前 BOSS。
+    function spawnChapterBoss() {
+      const d = CHAPTER2_BOSSES[chapter2BossIdx];
+      enemies.push({
+        type: d.type,
+        name: d.name,
+        x: WORLD.w / 2,
+        y: 380,
+        radius: d.radius,
+        hp: d.hp,
+        maxHp: d.hp,
+        dmg: d.dmg,
+        speed: d.speed,
+        aggro: d.aggro,
+        isBoss: true,
+        atk: 'melee',
+        atkCycle: d.atkCycle,
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'idle',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0
+      });
+      banner = { text: `${d.name} 现身！`, timer: 150 };
+    }
+
+    // 布置黄风岭（进图与阵亡复活共用）。
+    function setupHuangfeng() {
+      currentMap = 'huangfeng';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      const placements = [
+        ['rat', 7], ['snake', 4], ['golem', 3]
+      ];
+      for (const [type, count] of placements) {
+        for (let i = 0; i < count; i++) {
+          let x, y;
+          do {
+            x = randomRange(120, WORLD.w - 120);
+            y = randomRange(120, WORLD.h - 120);
+          } while (Math.hypot(x - WORLD.w / 2, y - (WORLD.h - 260)) < 420
+            || Math.hypot(x - WORLD.w / 2, y - 380) < 320);
+          spawnEnemy(type, x, y);
+        }
+      }
+      for (let i = 0; i < 5; i++) {
+        peaches.push({
+          x: randomRange(150, WORLD.w - 150),
+          y: randomRange(150, WORLD.h - 150),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      chapter2BossIdx = 0;
+      nextBossCountdown = 0;
+      spawnChapterBoss();
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 260;
+      player.hp = player.maxHp;
+      player.hurtCooldown = 0;
+      bossActive = false;
+      updateUI();
+    }
+
+    function enterHuangfeng() {
+      // 黄风岭入口即存档点。
+      checkpoint = { map: 'huangfeng' };
+      setupHuangfeng();
+      banner = { text: '第二章 · 黄风岭（存档点）', timer: 180 };
+    }
+
+    function respawnAtCheckpoint() {
+      overlay.style.display = 'none';
+      setupHuangfeng();
+      banner = { text: '于黄风岭存档点复活', timer: 140 };
+      gameRunning = true;
+      gameLoop();
+    }
+
+    function scatterWorld() {
+      // 各种小怪散布全图（离出生点远一点）。
+      const placements = [
+        ['wolf', 8], ['snake', 6], ['golem', 4]
+      ];
+      for (const [type, count] of placements) {
+        for (let i = 0; i < count; i++) {
+          let x, y;
+          do {
+            x = randomRange(120, WORLD.w - 120);
+            y = randomRange(120, WORLD.h - 120);
+          } while (Math.hypot(x - player.x, y - player.y) < 420);
+          spawnEnemy(type, x, y);
+        }
+      }
+      for (let i = 0; i < 6; i++) {
+        peaches.push({
+          x: randomRange(150, WORLD.w - 150),
+          y: randomRange(150, WORLD.h - 150),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      // 装饰：树木、岩石、花草。
+      decor = { trees: [], rocks: [], flowers: [] };
+      for (let i = 0; i < 40; i++) {
+        decor.trees.push({ x: seeded(i) * WORLD.w, y: seeded(i + 400) * WORLD.h, s: 0.7 + seeded(i + 800) * 0.7 });
+      }
+      for (let i = 0; i < 22; i++) {
+        decor.rocks.push({ x: seeded(i + 1200) * WORLD.w, y: seeded(i + 1600) * WORLD.h, s: 0.5 + seeded(i + 2000) * 0.9 });
+      }
+      for (let i = 0; i < 70; i++) {
+        decor.flowers.push({
+          x: seeded(i + 2400) * WORLD.w,
+          y: seeded(i + 2800) * WORLD.h,
+          c: ['#e8e08a', '#d98ab0', '#c9c9e8'][i % 3]
+        });
+      }
+    }
+
+    function createParticles(x, y, color, count = 10) {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x,
+          y,
+          vx: randomRange(-3.5, 3.5),
+          vy: randomRange(-3.5, 3.5),
+          life: 1,
+          color,
+          size: randomRange(2, 4.5)
+        });
+      }
+    }
+
+    function createDamageText(x, y, damage, color = '#ffd700') {
+      damageTexts.push({ x, y, damage, color, life: 1, vy: -1.6 });
+    }
+
+    function updateUI() {
+      const bellInfo = currentMap === 'forest' ? ` | 钟: ${bellsRung}/3` : '';
+      scoreEl.textContent = `得分: ${score} | 击杀: ${kills}${bellInfo}`;
+      const currentHp = Math.max(0, player.hp);
+      playerHpTextEl.textContent = `生命值: ${currentHp}/${player.maxHp}`;
+      playerHpFillEl.style.width = `${(currentHp / player.maxHp) * 100}%`;
+      if (bossActive) {
+        const boss = enemies.find(e => e.isBoss);
+        if (boss) {
+          bossHpEl.style.display = 'block';
+          bossHpEl.textContent = `${boss.name} HP: ${Math.max(0, boss.hp)}/${boss.maxHp}`;
+        }
+      }
+    }
+
+    function initGame() {
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h / 2 + 300;
+      player.angle = -Math.PI / 2;
+      player.hp = player.maxHp;
+      player.hurtCooldown = 0;
+      player.empowered = false;
+      staff.swinging = false;
+      staff.timer = 0;
+      staff.cooldown = 0;
+      staff.power = 1;
+      charge.charging = false;
+      charge.level = 0;
+      for (const k in skills) skills[k].cd = 0;
+      skillFx = [];
+      transform.active = false;
+      transform.timer = 0;
+      skills.transform.el.classList.remove('active');
+      combo.count = 0;
+      combo.timer = 0;
+      dodge.active = false;
+      dodge.cooldown = 0;
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      particles = [];
+      projectiles = [];
+      slashes = [];
+      damageTexts = [];
+      score = 0;
+      kills = 0;
+      bossActive = false;
+      frameCount = 0;
+      currentMap = 'forest';
+      forestState = null;
+      banner = null;
+      templeCountdown = 0;
+      returnCountdown = 0;
+      chapterCountdown = 0;
+      checkpoint = null;
+      chapter2BossIdx = 0;
+      nextBossCountdown = 0;
+      player.hasMantle = false;
+      document.getElementById('skill-mantle').style.display = 'none';
+      gameRunning = true;
+      overlay.style.display = 'none';
+      bossHpEl.style.display = 'none';
+      spawnBoss();
+      scatterWorld();
+      spawnBells();
+      updateUI();
+    }
+
+    function startCharge() {
+      if (charge.charging || staff.swinging || staff.cooldown > 0 || !gameRunning) return;
+      charge.charging = true;
+      charge.level = 0;
+    }
+
+    function releaseCharge() {
+      if (!charge.charging) return;
+      charge.charging = false;
+      // 蓄力越久伤害越高，最高 3 倍。
+      const power = 1 + charge.level * 2;
+      charge.level = 0;
+      startSwing(power);
+    }
+
+    function startSwing(power = 1) {
+      if (staff.swinging || staff.cooldown > 0 || !gameRunning) return;
+      const st = STANCES[stanceIdx];
+      staff.swinging = true;
+      staff.timer = staff.duration;
+      staff.cooldown = st.cd;
+      staff.power = power * (transform.active ? transform.dmgMult : 1);
+      // 连击：时间窗内连续挥棒提升段数，最高三段。
+      combo.count = combo.timer > 0 ? Math.min(combo.count + 1, 3) : 1;
+      combo.timer = combo.window;
+      const slash = {
+        kind: st.kind,
+        x: player.x,
+        y: player.y,
+        angle: player.angle,
+        arc: st.arc,
+        range: st.range,
+        radius: st.radius,
+        power,
+        fire: transform.active,
+        life: 1
+      };
+      if (st.kind === 'vault') {
+        slash.tx = player.x + Math.cos(player.angle) * st.range;
+        slash.ty = player.y + Math.sin(player.angle) * st.range;
+      }
+      slashes.push(slash);
+    }
+
+    function updateStaff() {
+      if (staff.cooldown > 0) staff.cooldown--;
+      if (!staff.swinging) return;
+      staff.timer--;
+      if (staff.timer === staff.duration - 4) {
+        checkAttackHits();
+      }
+      if (staff.timer <= 0) {
+        staff.swinging = false;
+      }
+    }
+
+    function applyDamage(e, damage) {
+      e.hp -= damage;
+      e.flash = 6;
+      createDamageText(e.x, e.y - e.radius * 3, damage);
+      createParticles(e.x, e.y - e.radius, '#ffd700', 10);
+      createParticles(e.x, e.y - e.radius, '#b71c1c', 7);
+      if (e.isBoss) bossActive = true;
+    }
+
+    // 清理死亡敌人并结算奖励，返回 true 表示已通关。
+    function handleKills() {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        if (e.hp > 0) continue;
+        enemies.splice(i, 1);
+        if (e.isBoss) {
+          score += 500;
+          bossHpEl.style.display = 'none';
+          if (e.name === '金池长老') {
+            // 击败金池长老：获得避火罩，短暂停留后回到黑风山。
+            player.hasMantle = true;
+            document.getElementById('skill-mantle').style.display = 'block';
+            banner = { text: '获得法宝【避火罩】！', timer: 170 };
+            returnCountdown = 200;
+            updateUI();
+            return false;
+          }
+          if (e.name === '黑风大王') {
+            // 第一章通关：前往第二章黄风岭。
+            banner = { text: '黑风山已破！前往黄风岭……', timer: 170 };
+            chapterCountdown = 200;
+            updateUI();
+            return false;
+          }
+          if (currentMap === 'huangfeng') {
+            if (e.name === '黄风大圣') {
+              // 第二章通关。
+              updateUI();
+              gameOver(true);
+              return true;
+            }
+            // BOSS 逐一现身：击败当前 BOSS 后，下一位稍后出现。
+            banner = { text: `${e.name}已灭！`, timer: 130 };
+            nextBossCountdown = 160;
+            updateUI();
+            return false;
+          }
+          updateUI();
+          gameOver(true);
+          return true;
+        }
+        score += e.score;
+        kills++;
+      }
+      updateUI();
+      return false;
+    }
+
+    function checkAttackHits() {
+      const st = STANCES[stanceIdx];
+      const comboMult = 1 + (combo.count - 1) * 0.35;
+      const power = (player.empowered ? 2 : 1) * staff.power;
+      player.empowered = false;
+      const mult = st.dmg * comboMult * power;
+
+      if (st.kind === 'vault') {
+        // 立棍：砸向面前落点的范围伤害。
+        const tx = player.x + Math.cos(player.angle) * st.range;
+        const ty = player.y + Math.sin(player.angle) * st.range;
+        for (const e of enemies) {
+          if (Math.hypot(e.x - tx, e.y - ty) > st.radius + e.radius) continue;
+          applyDamage(e, Math.round(rollDamage() * mult));
+        }
+        skillFx.push({ type: 'crack', x: tx, y: ty, angle: player.angle, life: 1 });
+        createParticles(tx, ty, '#d9c9a8', 14);
+        tryRingBellsAt(tx, ty, st.radius);
+      } else if (st.kind === 'thrust') {
+        // 戳棍：一条直线上的所有目标被贯穿。
+        const ca = Math.cos(player.angle);
+        const sa = Math.sin(player.angle);
+        for (const e of enemies) {
+          const dx = e.x - player.x;
+          const dy = e.y - player.y;
+          const along = dx * ca + dy * sa;
+          if (along < 0 || along > st.range + e.radius) continue;
+          const perp = Math.abs(-dx * sa + dy * ca);
+          if (perp > st.width / 2 + e.radius) continue;
+          applyDamage(e, Math.round(rollDamage() * mult));
+        }
+        tryRingBells(st.range, 0.35, player.angle);
+      } else {
+        // 劈棍：面前窄而远的重劈。
+        for (const e of enemies) {
+          const dx = e.x - player.x;
+          const dy = e.y - player.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > st.range + e.radius) continue;
+          if (Math.abs(angleDiff(Math.atan2(dy, dx), player.angle)) > st.arc / 2) continue;
+          applyDamage(e, Math.round(rollDamage() * mult));
+        }
+        const ix = player.x + Math.cos(player.angle) * st.range * 0.75;
+        const iy = player.y + Math.sin(player.angle) * st.range * 0.75;
+        skillFx.push({ type: 'crack', x: ix, y: iy, angle: player.angle, life: 1 });
+        createParticles(ix, iy, '#c9b995', 10);
+        tryRingBells(st.range, st.arc, player.angle);
+      }
+      handleKills();
+    }
+
+    // 定身术：定住附近的怪物。
+    function castFreeze() {
+      const s = skills.freeze;
+      if (s.cd > 0 || !gameRunning) return;
+      let hit = false;
+      for (const e of enemies) {
+        if (Math.hypot(e.x - player.x, e.y - player.y) > 420) continue;
+        e.frozen = FREEZE_DURATION;
+        hit = true;
+      }
+      if (!hit) return;
+      s.cd = s.maxCd;
+      skillFx.push({ type: 'freezewave', life: 1 });
+    }
+
+    // 横扫六合：以自身为中心的范围重击。
+    function castSweep() {
+      const s = skills.sweep;
+      if (s.cd > 0 || !gameRunning) return;
+      s.cd = s.maxCd;
+      let hit = false;
+      for (const e of enemies) {
+        const dx = e.x - player.x;
+        const dy = e.y - player.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 170) continue;
+        applyDamage(e, 60);
+        if (dist > 0) {
+          e.x += (dx / dist) * 80;
+          e.y += (dy / dist) * 80;
+        }
+        hit = true;
+      }
+      skillFx.push({ type: 'ring', x: player.x, y: player.y, life: 1 });
+      tryRingBells(170, null, null);
+      if (hit) handleKills();
+    }
+
+    // 火眼金睛：金光重创视野内最近的怪物。
+    function castFire() {
+      const s = skills.fire;
+      if (s.cd > 0 || !gameRunning) return;
+      let target = null;
+      let bestDist = Infinity;
+      for (const e of enemies) {
+        const dist = Math.hypot(e.x - player.x, e.y - player.y);
+        if (dist < 520 && dist < bestDist) {
+          bestDist = dist;
+          target = e;
+        }
+      }
+      if (!target) return;
+      s.cd = s.maxCd;
+      skillFx.push({ type: 'beam', x1: player.x, y1: player.y, x2: target.x, y2: target.y - target.radius, life: 1 });
+      applyDamage(target, 120);
+      handleKills();
+    }
+
+    function castTransform() {
+      const s = skills.transform;
+      if (s.cd > 0 || transform.active || !gameRunning) return;
+      s.cd = s.maxCd;
+      transform.active = true;
+      transform.timer = transform.duration;
+      createParticles(player.x, player.y, '#ff7a2a', 24);
+    }
+
+    function updateSkills() {
+      for (const k in skills) {
+        const s = skills[k];
+        if (s.cd > 0) s.cd--;
+        const cdEl = s.el.querySelector('.cd');
+        if (s.cd > 0) {
+          cdEl.textContent = Math.ceil(s.cd / 60) + 's';
+          s.el.classList.add('on-cd');
+        } else {
+          cdEl.textContent = '';
+          s.el.classList.remove('on-cd');
+        }
+      }
+      // 变身进行中：技能格显示剩余时间。
+      if (transform.active) {
+        transform.timer--;
+        const el = skills.transform.el;
+        el.querySelector('.cd').textContent = Math.ceil(transform.timer / 60) + 's';
+        el.classList.add('active');
+        el.classList.remove('on-cd');
+        if (transform.timer <= 0) {
+          transform.active = false;
+          el.classList.remove('active');
+        }
+        // 变身余烬。
+        if (frameCount % 5 === 0) {
+          particles.push({
+            x: player.x + randomRange(-12, 12),
+            y: player.y + randomRange(-16, 4),
+            vx: randomRange(-0.4, 0.4),
+            vy: randomRange(-1.4, -0.6),
+            life: 0.7,
+            color: '#ff8a3a',
+            size: randomRange(1.5, 3)
+          });
+        }
+      }
+      for (let i = skillFx.length - 1; i >= 0; i--) {
+        skillFx[i].life -= 0.045;
+        if (skillFx[i].life <= 0) skillFx.splice(i, 1);
+      }
+    }
+
+    function startDodge(dx, dy) {
+      if (dodge.active || dodge.cooldown > 0 || !gameRunning) return;
+      dodge.active = true;
+      dodge.timer = dodge.duration;
+      dodge.dx = dx;
+      dodge.dy = dy;
+      dodge.cooldown = dodge.maxCooldown;
+    }
+
+    function updatePlayer() {
+      // 蓄力进度与吸附光点。
+      if (charge.charging) {
+        charge.level = Math.min(1, charge.level + 1 / charge.max);
+        if (frameCount % 4 === 0) {
+          const a = Math.random() * Math.PI * 2;
+          particles.push({
+            x: player.x + Math.cos(a) * 46,
+            y: player.y + Math.sin(a) * 46,
+            vx: -Math.cos(a) * 2.6,
+            vy: -Math.sin(a) * 2.6,
+            life: 0.55,
+            color: charge.level >= 1 ? '#fff2b0' : '#ffd700',
+            size: 2.5
+          });
+        }
+      }
+
+      let mx = 0;
+      let my = 0;
+      if (keys['w'] || keys['W'] || keys['ArrowUp']) my -= 1;
+      if (keys['s'] || keys['S'] || keys['ArrowDown']) my += 1;
+      if (keys['a'] || keys['A'] || keys['ArrowLeft']) mx -= 1;
+      if (keys['d'] || keys['D'] || keys['ArrowRight']) mx += 1;
+
+      if (mx !== 0 || my !== 0) {
+        const len = Math.hypot(mx, my);
+        mx /= len;
+        my /= len;
+        // 蓄力时移动变缓。
+        const spd = player.speed * (transform.active ? transform.speedMult : 1) * (charge.charging ? 0.4 : 1);
+        player.x += mx * spd;
+        player.y += my * spd;
+        player.angle = Math.atan2(my, mx);
+        player.moveDx = mx;
+        player.moveDy = my;
+        // 行走动作。
+        player.moving = true;
+        player.walkPhase += 0.22;
+        if (mx > 0.1) player.facing = 1;
+        else if (mx < -0.1) player.facing = -1;
+      } else {
+        player.moving = false;
+      }
+
+      // 闪避冲刺。
+      if (dodge.cooldown > 0) dodge.cooldown--;
+      if (dodge.active) {
+        dodge.timer--;
+        player.x += dodge.dx * 9;
+        player.y += dodge.dy * 9;
+        if (dodge.timer <= 0) dodge.active = false;
+      }
+
+      player.x = clamp(player.x, player.r, WORLD.w - player.r);
+      player.y = clamp(player.y, player.r, WORLD.h - player.r);
+
+      if (player.hurtCooldown > 0) player.hurtCooldown--;
+      if (combo.timer > 0) {
+        combo.timer--;
+        if (combo.timer === 0) combo.count = 0;
+      }
+
+      camera.x = clamp(player.x - canvas.width / 2, 0, WORLD.w - canvas.width);
+      camera.y = clamp(player.y - canvas.height / 2, 0, WORLD.h - canvas.height);
+    }
+
+    // 受击结算（避火罩减伤 40%，广智变身期间无敌）。
+    function hurtPlayer(dmg) {
+      if (transform.active) return;
+      const real = player.hasMantle ? Math.round(dmg * 0.6) : dmg;
+      player.hp -= real;
+      player.hurtCooldown = player.maxHurtCooldown;
+      createDamageText(player.x, player.y - 40, real, '#ff5252');
+      createParticles(player.x, player.y, '#b71c1c', 10);
+      updateUI();
+      if (player.hp <= 0) gameOver(false);
+    }
+
+    function triggerPerfectDodge() {
+      createDamageText(player.x, player.y - 60, '完美闪避!', '#ffd700');
+      createParticles(player.x, player.y, '#ffd700', 16);
+      player.empowered = true;
+      for (const o of enemies) {
+        if (!o.isBoss) o.frozen = Math.max(o.frozen, 45);
+      }
+      score += 10;
+      updateUI();
+    }
+
+    // 投射物：蛇毒、飞石、风刃、佛珠。
+    let projectiles = [];
+
+    function spawnProjectile(e) {
+      const count = e.heavy ? 3 : 1;
+      const base = Math.atan2(player.y - e.y, player.x - e.x);
+      for (let i = 0; i < count; i++) {
+        const a = base + (i - (count - 1) / 2) * 0.28;
+        const sp = e.type === 'rat' ? 3 : 4.2;
+        projectiles.push({
+          x: e.x,
+          y: e.y - e.radius,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          radius: e.heavy ? 9 : 7,
+          dmg: Math.round(e.dmg * (e.heavy ? 1.3 : 1)),
+          heavy: !!e.heavy,
+          color: e.type === 'snake' ? '#8fd44a' : e.type === 'rat' ? '#b0a08a' : '#ffd24a',
+          life: 220
+        });
+      }
+    }
+
+    function updateProjectiles() {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        if (p.life <= 0) {
+          projectiles.splice(i, 1);
+          continue;
+        }
+        if (Math.hypot(p.x - player.x, p.y - player.y) < p.radius + player.r) {
+          if (dodge.active) triggerPerfectDodge();
+          else if (player.hurtCooldown <= 0) hurtPlayer(p.dmg);
+          createParticles(p.x, p.y, p.color, 8);
+          projectiles.splice(i, 1);
+        }
+      }
+    }
+
+    function updateEnemies() {
+      for (const e of enemies) {
+        if (e.flash > 0) e.flash--;
+        if (e.frozen > 0) {
+          e.frozen--;
+          continue;
+        }
+
+        const dx = player.x - e.x;
+        const dy = player.y - e.y;
+        const dist = Math.hypot(dx, dy);
+
+        // 扑击冲刺中。
+        if (e.lungeT > 0) {
+          e.lungeT--;
+          e.x += e.lungeVx;
+          e.y += e.lungeVy;
+          if (!e.lungeHit && dist < e.radius + player.r + 8) {
+            e.lungeHit = true;
+            if (dodge.active) triggerPerfectDodge();
+            else if (player.hurtCooldown <= 0) hurtPlayer(Math.round(e.dmg * (e.heavy ? 1.5 : 1)));
+          }
+        }
+
+        // 砸地冲击波扩散中。
+        if (e.aoeT > 0) {
+          e.aoeT--;
+          if (e.aoeT === 8 && !e.aoeHit) {
+            e.aoeHit = true;
+            if (dist < 170) {
+              if (dodge.active) triggerPerfectDodge();
+              else if (player.hurtCooldown <= 0) hurtPlayer(Math.round(e.dmg * 1.2));
+            }
+          }
+        }
+
+        if (e.state === 'idle') {
+          // 附近游走，发现玩家就追击。
+          e.wanderT--;
+          if (e.wanderT <= 0) {
+            e.wanderT = 60 + Math.random() * 90;
+            e.wanderA = Math.random() * Math.PI * 2;
+          }
+          e.x += Math.cos(e.wanderA) * e.speed * 0.35;
+          e.y += Math.sin(e.wanderA) * e.speed * 0.35;
+          if (dist < e.aggro) {
+            e.state = 'chase';
+            if (e.isBoss) bossActive = true;
+          }
+        } else if (e.state === 'chase') {
+          // 远程攻击手在远处即可出手。
+          const attackRange = e.atk === 'ranged' ? 300 : e.radius + player.r + 14;
+          if (dist > e.aggro * 1.6 && !e.isBoss) {
+            e.state = 'idle';
+          } else if (dist > attackRange) {
+            e.x += (dx / dist) * e.speed;
+            e.y += (dy / dist) * e.speed;
+          } else {
+            e.state = 'windup';
+            e.attackAlt++;
+            // BOSS 按序轮换招式，每第三招是大招（红光预警）。
+            if (e.atkCycle) e.atk = e.atkCycle[e.attackAlt % e.atkCycle.length];
+            e.heavy = e.isBoss && e.attackAlt % 3 === 0;
+            e.windup = e.heavy ? 48 : 32;
+          }
+        } else if (e.state === 'windup') {
+          e.windup--;
+          if (e.windup === 0) {
+            if (e.atk === 'ranged') {
+              spawnProjectile(e);
+            } else if (e.atk === 'lunge') {
+              e.lungeT = 16;
+              const sp = e.heavy ? 10 : 7.5;
+              e.lungeVx = (dx / (dist || 1)) * sp;
+              e.lungeVy = (dy / (dist || 1)) * sp;
+              e.lungeHit = false;
+            } else if (e.atk === 'aoe') {
+              e.aoeT = 26;
+              e.aoeHit = false;
+              skillFx.push({ type: 'shock', x: e.x, y: e.y, life: 1, max: 170 });
+              createParticles(e.x, e.y, '#ff3b30', 12);
+            } else {
+              // 近战挥击。
+              if (dodge.active) {
+                triggerPerfectDodge();
+              } else if (dist < e.radius + player.r + (e.heavy ? 44 : 30) && player.hurtCooldown <= 0) {
+                hurtPlayer(Math.round(e.dmg * (e.heavy ? 1.5 : 1)));
+              }
+            }
+            e.state = 'recover';
+            e.recover = e.heavy ? 60 : 40;
+          }
+        } else if (e.state === 'recover') {
+          e.recover--;
+          if (e.recover <= 0) e.state = 'chase';
+        }
+
+        e.x = clamp(e.x, e.radius, WORLD.w - e.radius);
+        e.y = clamp(e.y, e.radius, WORLD.h - e.radius);
+      }
+    }
+
+    function updatePeaches() {
+      for (let i = peaches.length - 1; i >= 0; i--) {
+        const p = peaches[i];
+        p.pulse += 0.08;
+        if (Math.hypot(p.x - player.x, p.y - player.y) < player.r + 16 && player.hp < player.maxHp) {
+          player.hp = Math.min(player.maxHp, player.hp + HEAL_AMOUNT);
+          createParticles(p.x, p.y, '#f5a572', 14);
+          peaches.splice(i, 1);
+          updateUI();
+        }
+      }
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.96;
+        p.vy *= 0.96;
+        p.life -= 0.03;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function updateSlashes() {
+      for (let i = slashes.length - 1; i >= 0; i--) {
+        slashes[i].life -= 0.09;
+        if (slashes[i].life <= 0) slashes.splice(i, 1);
+      }
+    }
+
+    function updateDamageTexts() {
+      for (let i = damageTexts.length - 1; i >= 0; i--) {
+        const t = damageTexts[i];
+        t.y += t.vy;
+        t.life -= 0.02;
+        if (t.life <= 0) damageTexts.splice(i, 1);
+      }
+    }
+
+    // ---------- 绘制 ----------
+
+    function drawGround() {
+      if (currentMap === 'huangfeng') {
+        // 黄风岭：漫漫黄沙。
+        ctx.fillStyle = '#c9a86a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < 260; i++) {
+          const gx = seeded(i + 3200) * WORLD.w;
+          const gy = seeded(i + 3600) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -80 || sy < -80 || sx > canvas.width + 80 || sy > canvas.height + 80) continue;
+          ctx.fillStyle = seeded(i + 4000) > 0.5 ? 'rgba(170, 135, 80, 0.45)' : 'rgba(225, 195, 135, 0.4)';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 34 + seeded(i + 1) * 60, 14 + seeded(i + 2) * 24, seeded(i + 3) * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // 流动风沙。
+        ctx.strokeStyle = 'rgba(235, 210, 160, 0.35)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 16; i++) {
+          const gx = ((seeded(i + 7200) * WORLD.w + frameCount * 2.4) % WORLD.w) - camera.x;
+          const gy = seeded(i + 7600) * WORLD.h - camera.y;
+          if (gx < -60 || gy < -20 || gx > canvas.width + 60 || gy > canvas.height + 20) continue;
+          ctx.beginPath();
+          ctx.moveTo(gx, gy);
+          ctx.lineTo(gx + 34, gy - 5);
+          ctx.stroke();
+        }
+        return;
+      }
+
+      if (currentMap === 'temple') {
+        // 禅院石板地。
+        ctx.fillStyle = '#82827c';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'rgba(70, 70, 66, 0.55)';
+        ctx.lineWidth = 2;
+        const tile = 90;
+        const ox = -(camera.x % tile);
+        const oy = -(camera.y % tile);
+        ctx.beginPath();
+        for (let x = ox; x < canvas.width; x += tile) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+        }
+        for (let y = oy; y < canvas.height; y += tile) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+        // 石板色差。
+        for (let i = 0; i < 120; i++) {
+          const gx = seeded(i + 6000) * WORLD.w;
+          const gy = seeded(i + 6400) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -90 || sy < -90 || sx > canvas.width + 90 || sy > canvas.height + 90) continue;
+          ctx.fillStyle = seeded(i + 6800) > 0.5 ? 'rgba(120, 120, 114, 0.35)' : 'rgba(150, 150, 142, 0.3)';
+          ctx.fillRect(sx - 45, sy - 45, 88, 88);
+        }
+        return;
+      }
+
+      // 基础草地。
+      ctx.fillStyle = '#6b8f40';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 深浅草色块（仅画可见范围内的）。
+      for (let i = 0; i < 300; i++) {
+        const gx = seeded(i + 3200) * WORLD.w;
+        const gy = seeded(i + 3600) * WORLD.h;
+        const sx = gx - camera.x;
+        const sy = gy - camera.y;
+        if (sx < -80 || sy < -80 || sx > canvas.width + 80 || sy > canvas.height + 80) continue;
+        ctx.fillStyle = seeded(i + 4000) > 0.5 ? 'rgba(88, 128, 54, 0.5)' : 'rgba(124, 164, 82, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, 30 + seeded(i + 1) * 50, 16 + seeded(i + 2) * 28, seeded(i + 3) * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 草叶细节。
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 260; i++) {
+        const gx = seeded(i + 4400) * WORLD.w;
+        const gy = seeded(i + 4800) * WORLD.h;
+        const sx = gx - camera.x;
+        const sy = gy - camera.y;
+        if (sx < -10 || sy < -10 || sx > canvas.width + 10 || sy > canvas.height + 10) continue;
+        ctx.strokeStyle = seeded(i + 5200) > 0.5 ? '#557a30' : '#649138';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + (seeded(i) - 0.5) * 6, sy - 5 - seeded(i + 7) * 5);
+        ctx.stroke();
+      }
+    }
+
+    function drawDecor() {
+      if (currentMap === 'huangfeng') {
+        // 黄风岭：褐岩与枯树。
+        for (const r of decor.rocks) {
+          const sx = r.x - camera.x;
+          const sy = r.y - camera.y;
+          if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) continue;
+          ctx.fillStyle = '#8a6a48';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 18 * r.s, 13 * r.s, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#a07c54';
+          ctx.beginPath();
+          ctx.ellipse(sx - 4 * r.s, sy - 4 * r.s, 10 * r.s, 7 * r.s, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        for (const t of decor.trees) {
+          const sx = t.x - camera.x;
+          const sy = t.y - camera.y;
+          if (sx < -90 || sy < -90 || sx > canvas.width + 90 || sy > canvas.height + 90) continue;
+          ctx.fillStyle = 'rgba(0,0,0,0.15)';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy + 4, 20 * t.s, 7 * t.s, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#6b4a2a';
+          ctx.lineWidth = 5 * t.s;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx, sy - 30 * t.s);
+          ctx.moveTo(sx, sy - 20 * t.s);
+          ctx.lineTo(sx - 14 * t.s, sy - 34 * t.s);
+          ctx.moveTo(sx, sy - 24 * t.s);
+          ctx.lineTo(sx + 12 * t.s, sy - 38 * t.s);
+          ctx.stroke();
+        }
+        return;
+      }
+      if (currentMap === 'temple') {
+        drawTempleDecor();
+        return;
+      }
+      // 岩石。
+      for (const r of decor.rocks) {
+        const sx = r.x - camera.x;
+        const sy = r.y - camera.y;
+        if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) continue;
+        ctx.fillStyle = '#8d8d90';
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, 18 * r.s, 13 * r.s, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#a8a8ac';
+        ctx.beginPath();
+        ctx.ellipse(sx - 4 * r.s, sy - 4 * r.s, 10 * r.s, 7 * r.s, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 花草。
+      for (const f of decor.flowers) {
+        const sx = f.x - camera.x;
+        const sy = f.y - camera.y;
+        if (sx < -10 || sy < -10 || sx > canvas.width + 10 || sy > canvas.height + 10) continue;
+        ctx.fillStyle = f.c;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 树木（阴影 + 树干 + 树冠）。
+      for (const t of decor.trees) {
+        const sx = t.x - camera.x;
+        const sy = t.y - camera.y;
+        if (sx < -90 || sy < -90 || sx > canvas.width + 90 || sy > canvas.height + 90) continue;
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.beginPath();
+        ctx.ellipse(sx, sy + 4, 26 * t.s, 9 * t.s, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#6b4a2a';
+        ctx.fillRect(sx - 3 * t.s, sy - 14 * t.s, 6 * t.s, 16 * t.s);
+        ctx.fillStyle = '#3c5c2e';
+        ctx.beginPath();
+        ctx.arc(sx, sy - 26 * t.s, 20 * t.s, 0, Math.PI * 2);
+        ctx.arc(sx - 14 * t.s, sy - 16 * t.s, 13 * t.s, 0, Math.PI * 2);
+        ctx.arc(sx + 14 * t.s, sy - 16 * t.s, 13 * t.s, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#4a703a';
+        ctx.beginPath();
+        ctx.arc(sx - 5 * t.s, sy - 30 * t.s, 12 * t.s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // 旧观音禅院：大殿、红柱、石灯笼。
+    function drawTempleDecor() {
+      const cx = WORLD.w / 2;
+      const sx = cx - camera.x;
+      const sy = 200 - camera.y;
+
+      if (sy > -380 && sy < canvas.height + 100) {
+        // 台基。
+        ctx.fillStyle = '#8a8a84';
+        ctx.fillRect(sx - 280, sy + 70, 560, 44);
+        // 墙体。
+        ctx.fillStyle = '#7d3b30';
+        ctx.fillRect(sx - 250, sy - 50, 500, 120);
+        // 殿门。
+        ctx.fillStyle = '#2a1410';
+        ctx.fillRect(sx - 50, sy + 8, 100, 62);
+        // 红柱。
+        ctx.fillStyle = '#9e2b25';
+        for (let i = -2; i <= 2; i++) {
+          ctx.fillRect(sx + i * 115 - 13, sy - 50, 26, 120);
+        }
+        // 屋顶。
+        ctx.fillStyle = '#3d3428';
+        ctx.beginPath();
+        ctx.moveTo(sx - 300, sy - 50);
+        ctx.quadraticCurveTo(sx - 140, sy - 120, sx, sy - 130);
+        ctx.quadraticCurveTo(sx + 140, sy - 120, sx + 300, sy - 50);
+        ctx.lineTo(sx + 260, sy - 50);
+        ctx.lineTo(sx - 260, sy - 50);
+        ctx.closePath();
+        ctx.fill();
+        // 匾额。
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(sx - 80, sy - 96, 160, 34);
+        ctx.strokeStyle = '#d4af37';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(sx - 80, sy - 96, 160, 34);
+        ctx.fillStyle = '#d4af37';
+        ctx.font = 'bold 20px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('旧观音禅院', sx, sy - 72);
+        ctx.textAlign = 'left';
+      }
+
+      // 石灯笼。
+      const lanterns = [
+        [cx - 350, 520], [cx + 350, 520],
+        [cx - 350, 900], [cx + 350, 900]
+      ];
+      for (const [lx, ly] of lanterns) {
+        const lx2 = lx - camera.x;
+        const ly2 = ly - camera.y;
+        if (lx2 < -50 || ly2 < -50 || lx2 > canvas.width + 50 || ly2 > canvas.height + 50) continue;
+        ctx.fillStyle = '#77776f';
+        ctx.fillRect(lx2 - 10, ly2 - 40, 20, 40);
+        ctx.fillRect(lx2 - 16, ly2 - 52, 32, 12);
+        ctx.fillStyle = '#ffe9a8';
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 14;
+        ctx.fillRect(lx2 - 8, ly2 - 40, 16, 14);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#5c5c56';
+        ctx.fillRect(lx2 - 14, ly2, 28, 8);
+      }
+    }
+
+    // 山钟：木架悬钟，敲响后金光并摆动。
+    function drawBell(b) {
+      const sx = b.x - camera.x;
+      const sy = b.y - camera.y;
+      if (sx < -80 || sy < -100 || sx > canvas.width + 80 || sy > canvas.height + 80) return;
+
+      // 木架。
+      ctx.fillStyle = '#5a3d20';
+      ctx.fillRect(sx - 26, sy - 58, 7, 58);
+      ctx.fillRect(sx + 19, sy - 58, 7, 58);
+      ctx.fillRect(sx - 30, sy - 65, 60, 8);
+
+      const sway = b.swing > 0.01 ? Math.sin(frameCount * 0.35) * 0.2 * b.swing : 0;
+      ctx.save();
+      ctx.translate(sx, sy - 57);
+      ctx.rotate(sway);
+
+      if (b.rung) {
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 16;
+      }
+      // 钟体。
+      const bronze = ctx.createLinearGradient(-20, 0, 20, 0);
+      bronze.addColorStop(0, '#8a6428');
+      bronze.addColorStop(0.5, b.rung ? '#e0b050' : '#b08a3e');
+      bronze.addColorStop(1, '#7a5620');
+      ctx.fillStyle = bronze;
+      ctx.beginPath();
+      ctx.moveTo(-11, 10);
+      ctx.quadraticCurveTo(-17, 30, -19, 40);
+      ctx.lineTo(19, 40);
+      ctx.quadraticCurveTo(17, 30, 11, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // 钟口沿与顶钮。
+      ctx.fillStyle = '#6a4a1a';
+      ctx.fillRect(-20, 38, 40, 5);
+      ctx.beginPath();
+      ctx.arc(0, 8, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // 金池长老：金色大头、赤金僧袍、手持禅杖的完整身形。
+    function drawJinchi(e, sx, sy) {
+      const u = e.radius * 1.2;
+      const bob = Math.sin(frameCount * 0.07) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.3, u * 2);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.15, u * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 僧鞋。
+      ctx.fillStyle = '#2a1a10';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.32, -u * 0.06, u * 0.22, u * 0.1, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.32, -u * 0.06, u * 0.22, u * 0.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 僧袍长袍：自肩向脚摆展开。
+      const robe = ctx.createLinearGradient(-u, 0, u, 0);
+      robe.addColorStop(0, '#7a1d18');
+      robe.addColorStop(0.5, '#b03028');
+      robe.addColorStop(1, '#7a1d18');
+      ctx.fillStyle = robe;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.6, -u * 2.15);
+      ctx.quadraticCurveTo(-u * 0.95, -u * 1.1, -u * 0.9, 0);
+      ctx.lineTo(u * 0.9, 0);
+      ctx.quadraticCurveTo(u * 0.95, -u * 1.1, u * 0.6, -u * 2.15);
+      ctx.closePath();
+      ctx.fill();
+      // 金色衣缘与袈裟斜纹。
+      ctx.strokeStyle = '#d4af37';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.86, -u * 0.12);
+      ctx.lineTo(u * 0.86, -u * 0.12);
+      ctx.moveTo(-u * 0.5, -u * 2.1);
+      ctx.lineTo(u * 0.35, -u * 0.2);
+      ctx.stroke();
+
+      // 双臂：宽袖垂于两侧，露出手。
+      ctx.fillStyle = '#8e231d';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.78, -u * 1.5, u * 0.26, u * 0.62, 0.25, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.78, -u * 1.5, u * 0.26, u * 0.62, -0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d9b48c';
+      ctx.beginPath();
+      ctx.arc(-u * 0.92, -u * 0.98, u * 0.13, 0, Math.PI * 2);
+      ctx.arc(u * 0.92, -u * 0.98, u * 0.13, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 禅杖：金环长杖。
+      ctx.strokeStyle = '#8a6a2a';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(u * 1.05, -u * 0.1);
+      ctx.lineTo(u * 1.05, -u * 3.1);
+      ctx.stroke();
+      ctx.strokeStyle = '#d4af37';
+      ctx.lineWidth = 2.5;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(u * 1.05 + (i - 1) * u * 0.12, -u * 3.2, u * 0.08, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 金色大头。
+      const head = ctx.createRadialGradient(-u * 0.15, -u * 2.75, u * 0.1, 0, -u * 2.6, u * 0.6);
+      head.addColorStop(0, '#f0c040');
+      head.addColorStop(1, '#a87818');
+      ctx.fillStyle = head;
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.6, u * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 眉眼、眉心与嘴。
+      ctx.fillStyle = '#3a2408';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.2, -u * 2.66, u * 0.09, u * 0.04, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.2, -u * 2.66, u * 0.09, u * 0.04, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#a31515';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.8, u * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#3a2408';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.48, u * 0.14, 0.3, Math.PI - 0.3);
+      ctx.stroke();
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.4, u * 1.2, u * 1.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.6;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.7;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
+    // 鼠妖：佝偻的灰鼠小妖全身——小脚、躯干、双臂、鼠头长尾（原点为脚底）。
+    function drawRatChar(e, sx, sy) {
+      const r = e.radius;
+      const bob = Math.sin(frameCount * 0.16 + e.bob) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -r * 1, r * 1.8);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 尾巴。
+      ctx.strokeStyle = '#8a7a6a';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.3);
+      ctx.quadraticCurveTo(r * 1.2, -r * 0.1, r * 1.4, -r * 0.8);
+      ctx.stroke();
+
+      // 小脚。
+      ctx.fillStyle = '#5c4e40';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.28, -r * 0.06, r * 0.2, r * 0.09, 0, 0, Math.PI * 2);
+      ctx.ellipse(r * 0.28, -r * 0.06, r * 0.2, r * 0.09, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 佝偻的身体。
+      ctx.fillStyle = '#7a6a58';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.75, r * 0.72, r * 0.68, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 细手臂与尖爪。
+      ctx.fillStyle = '#6a5c4c';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.68, -r * 0.8, r * 0.13, r * 0.4, 0.35, 0, Math.PI * 2);
+      ctx.ellipse(r * 0.68, -r * 0.8, r * 0.13, r * 0.4, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e8e0d0';
+      for (const side of [-1, 1]) {
+        for (let c = 0; c < 2; c++) {
+          ctx.beginPath();
+          ctx.moveTo(side * (r * 0.76 + c * r * 0.07), -r * 0.44);
+          ctx.lineTo(side * (r * 0.82 + c * r * 0.07), -r * 0.44);
+          ctx.lineTo(side * (r * 0.79 + c * r * 0.07), -r * 0.28);
+          ctx.fill();
+        }
+      }
+
+      // 鼠头：尖吻 + 大圆耳。
+      ctx.fillStyle = '#8a7a68';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 1.55, r * 0.45, r * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#7a6a58';
+      ctx.beginPath();
+      ctx.arc(-r * 0.32, -r * 1.83, r * 0.22, 0, Math.PI * 2);
+      ctx.arc(r * 0.32, -r * 1.83, r * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#c9a8a0';
+      ctx.beginPath();
+      ctx.arc(-r * 0.32, -r * 1.83, r * 0.11, 0, Math.PI * 2);
+      ctx.arc(r * 0.32, -r * 1.83, r * 0.11, 0, Math.PI * 2);
+      ctx.fill();
+      // 尖吻与门牙。
+      ctx.fillStyle = '#9a8a78';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 1.37, r * 0.2, r * 0.13, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f0ead0';
+      ctx.fillRect(-r * 0.06, -r * 1.27, r * 0.12, r * 0.14);
+      // 红眼。
+      ctx.fillStyle = '#d33';
+      ctx.beginPath();
+      ctx.arc(-r * 0.17, -r * 1.57, r * 0.07, 0, Math.PI * 2);
+      ctx.arc(r * 0.17, -r * 1.57, r * 0.07, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.55;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.95, r, r * 1.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+    }
+
+    // 黄风大圣：黄袍貂鼠妖王全身——双腿、黄袍、双臂持三股钢叉，黄风环绕。
+    function drawHuangfengBoss(e, sx, sy) {
+      const u = e.radius * 1.2;
+      const bob = Math.sin(frameCount * 0.07) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.3, u * 1.9);
+
+      // 环绕的黄风。
+      ctx.strokeStyle = 'rgba(230, 200, 120, 0.45)';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        const a0 = frameCount * 0.06 + i * (Math.PI * 2 / 3);
+        ctx.beginPath();
+        ctx.arc(0, -u * 1.3, u * 1.6, a0, a0 + 1.1);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.15, u * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 双腿。
+      ctx.fillStyle = '#5c3f10';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.32, -u * 0.45, u * 0.22, u * 0.48, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.32, -u * 0.45, u * 0.22, u * 0.48, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 三股钢叉（右臂持握）。
+      ctx.strokeStyle = '#8a8a92';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(u * 1.05, 0);
+      ctx.lineTo(u * 1.35, -u * 2.9);
+      ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(u * 1.35, -u * 2.9);
+      ctx.lineTo(u * 1.42, -u * 3.3);
+      ctx.moveTo(u * 1.22, -u * 2.82);
+      ctx.lineTo(u * 1.12, -u * 3.2);
+      ctx.moveTo(u * 1.48, -u * 2.82);
+      ctx.lineTo(u * 1.6, -u * 3.18);
+      ctx.stroke();
+
+      // 黄袍躯干。
+      const robe = ctx.createRadialGradient(-u * 0.2, -u * 1.7, u * 0.2, 0, -u * 1.3, u * 1.2);
+      robe.addColorStop(0, '#c99a3a');
+      robe.addColorStop(1, '#7a5518');
+      ctx.fillStyle = robe;
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.3, u * 0.85, u * 0.95, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 双臂。
+      ctx.fillStyle = '#a87c3a';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.8, -u * 1.35, u * 0.2, u * 0.55, 0.4, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.85, -u * 1.4, u * 0.2, u * 0.55, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 貂鼠头：尖脸 + 圆耳。
+      ctx.fillStyle = '#a87c3a';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 2.55, u * 0.5, u * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(-u * 0.36, -u * 2.88, u * 0.19, 0, Math.PI * 2);
+      ctx.arc(u * 0.36, -u * 2.88, u * 0.19, 0, Math.PI * 2);
+      ctx.fill();
+      // 尖吻与鼻。
+      ctx.fillStyle = '#bf9450';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 2.38, u * 0.24, u * 0.15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2a1a0a';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.44, u * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+      // 赤红双眼。
+      ctx.fillStyle = '#d42a2a';
+      ctx.shadowColor = '#ff4444';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.2, -u * 2.6, u * 0.09, u * 0.06, -0.3, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.2, -u * 2.6, u * 0.09, u * 0.06, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.4, u * 1.2, u * 1.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.6;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.8;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
+    // 沙国王父子：巨鼠背上的小国王。
+    function drawShaguo(e, sx, sy) {
+      const u = e.radius * 1.15;
+      const bob = Math.sin(frameCount * 0.1 + e.bob) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.3, u * 1.9);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.26)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.2, u * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 大尾巴。
+      ctx.strokeStyle = '#8a7a6a';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, -u * 0.4);
+      ctx.quadraticCurveTo(u * 1.6, -u * 0.2, u * 1.8, -u * 1.1);
+      ctx.stroke();
+
+      // 脚爪。
+      ctx.fillStyle = '#5c4e40';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.4, -u * 0.08, u * 0.26, u * 0.12, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.4, -u * 0.08, u * 0.26, u * 0.12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 巨鼠躯干。
+      const fur = ctx.createRadialGradient(-u * 0.2, -u * 1.5, u * 0.2, 0, -u * 1.1, u * 1.2);
+      fur.addColorStop(0, '#9a8870');
+      fur.addColorStop(1, '#6a5a48');
+      ctx.fillStyle = fur;
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.1, u * 0.95, u * 0.9, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 双臂与尖爪。
+      ctx.fillStyle = '#6a5a48';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.9, -u * 1.15, u * 0.2, u * 0.5, 0.3, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.9, -u * 1.15, u * 0.2, u * 0.5, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e8e0d0';
+      for (const side of [-1, 1]) {
+        for (let c = 0; c < 3; c++) {
+          ctx.beginPath();
+          ctx.moveTo(side * (u * 1.0 + c * u * 0.08), -u * 0.7);
+          ctx.lineTo(side * (u * 1.08 + c * u * 0.08), -u * 0.7);
+          ctx.lineTo(side * (u * 1.04 + c * u * 0.08), -u * 0.48);
+          ctx.fill();
+        }
+      }
+
+      // 巨鼠头。
+      ctx.fillStyle = '#8a7a68';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 2.15, u * 0.5, u * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#7a6a58';
+      ctx.beginPath();
+      ctx.arc(-u * 0.36, -u * 2.5, u * 0.22, 0, Math.PI * 2);
+      ctx.arc(u * 0.36, -u * 2.5, u * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#c9a8a0';
+      ctx.beginPath();
+      ctx.arc(-u * 0.36, -u * 2.5, u * 0.11, 0, Math.PI * 2);
+      ctx.arc(u * 0.36, -u * 2.5, u * 0.11, 0, Math.PI * 2);
+      ctx.fill();
+      // 尖吻与大门牙。
+      ctx.fillStyle = '#9a8a78';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.92, u * 0.24, u * 0.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f0ead0';
+      ctx.fillRect(-u * 0.07, -u * 1.8, u * 0.14, u * 0.2);
+      // 红眼。
+      ctx.fillStyle = '#d42a2a';
+      ctx.beginPath();
+      ctx.arc(-u * 0.2, -u * 2.18, u * 0.08, 0, Math.PI * 2);
+      ctx.arc(u * 0.2, -u * 2.18, u * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 背上的小国王：小金冠 + 红袍。
+      ctx.fillStyle = '#a31515';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.85, u * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d4af37';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.14, -u * 2.95);
+      ctx.lineTo(-u * 0.14, -u * 3.15);
+      ctx.lineTo(-u * 0.07, -u * 3.02);
+      ctx.lineTo(0, -u * 3.18);
+      ctx.lineTo(u * 0.07, -u * 3.02);
+      ctx.lineTo(u * 0.14, -u * 3.15);
+      ctx.lineTo(u * 0.14, -u * 2.95);
+      ctx.closePath();
+      ctx.fill();
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.4, u * 1.25, u * 1.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.6;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.7;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
+    // 石先锋：持石棒的岩甲巨人。
+    function drawShixian(e, sx, sy) {
+      const u = e.radius * 1.15;
+      const bob = Math.sin(frameCount * 0.06) * 1.5;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.4, u * 1.9);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.26)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.25, u * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 石棒（右臂持握）。
+      ctx.fillStyle = '#6a6a70';
+      ctx.save();
+      ctx.translate(u * 1.35, -u * 1.2);
+      ctx.rotate(-0.15);
+      ctx.fillRect(-u * 0.08, -u * 1.2, u * 0.16, u * 1.6);
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.35, u * 0.22, u * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 石腿。
+      ctx.fillStyle = '#6f6f73';
+      ctx.beginPath();
+      ctx.arc(-u * 0.42, -u * 0.3, u * 0.34, 0, Math.PI * 2);
+      ctx.arc(u * 0.42, -u * 0.3, u * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 岩甲躯干（带尖刺肩甲）。
+      const rock = ctx.createRadialGradient(-u * 0.3, -u * 1.7, u * 0.2, 0, -u * 1.3, u * 1.4);
+      rock.addColorStop(0, '#9a9aa0');
+      rock.addColorStop(1, '#54545c');
+      ctx.fillStyle = rock;
+      ctx.beginPath();
+      ctx.arc(0, -u * 1.3, u * 1.05, 0, Math.PI * 2);
+      ctx.fill();
+      // 肩部岩刺。
+      ctx.fillStyle = '#5c5c62';
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * u * 0.7, -u * 2.0);
+        ctx.lineTo(side * u * 1.25, -u * 2.5);
+        ctx.lineTo(side * u * 1.0, -u * 1.75);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // 双臂石拳。
+      ctx.fillStyle = '#6f6f73';
+      ctx.beginPath();
+      ctx.ellipse(-u * 1.1, -u * 1.25, u * 0.3, u * 0.55, 0.2, 0, Math.PI * 2);
+      ctx.ellipse(u * 1.1, -u * 1.25, u * 0.3, u * 0.55, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#54545c';
+      ctx.beginPath();
+      ctx.arc(-u * 1.2, -u * 0.75, u * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 裂纹。
+      ctx.strokeStyle = 'rgba(35, 35, 40, 0.7)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.4, -u * 2);
+      ctx.lineTo(-u * 0.1, -u * 1.5);
+      ctx.lineTo(-u * 0.35, -u * 1);
+      ctx.moveTo(u * 0.45, -u * 1.8);
+      ctx.lineTo(u * 0.2, -u * 1.3);
+      ctx.stroke();
+
+      // 岩盔头与独角。
+      ctx.fillStyle = '#7a7a80';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.4, u * 0.48, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#54545c';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.12, -u * 2.75);
+      ctx.lineTo(0, -u * 3.15);
+      ctx.lineTo(u * 0.12, -u * 2.75);
+      ctx.closePath();
+      ctx.fill();
+      // 发光双眼。
+      ctx.fillStyle = '#ff9a2a';
+      ctx.shadowColor = '#ff9a2a';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(-u * 0.18, -u * 2.4, u * 0.09, 0, Math.PI * 2);
+      ctx.arc(u * 0.18, -u * 2.4, u * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.4, u * 1.35, u * 1.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.6;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.8;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
+    // 虎先锋：橙毛黑纹的虎妖武者。
+    function drawHuxian(e, sx, sy) {
+      const u = e.radius * 1.15;
+      const bob = Math.sin(frameCount * 0.1 + e.bob) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.4, u * 1.9);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.26)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.1, u * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 虎尾。
+      ctx.strokeStyle = '#d4792a';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, -u * 0.5);
+      ctx.quadraticCurveTo(u * 1.3, -u * 0.4, u * 1.5, -u * 1.2);
+      ctx.stroke();
+      ctx.fillStyle = '#2a2a2a';
+      ctx.beginPath();
+      ctx.arc(u * 1.5, -u * 1.2, u * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 双腿。
+      ctx.fillStyle = '#b8621e';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.36, -u * 0.5, u * 0.3, u * 0.55, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.36, -u * 0.5, u * 0.3, u * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 肌肉躯干。
+      const fur = ctx.createLinearGradient(0, -u * 2.2, 0, -u * 0.8);
+      fur.addColorStop(0, '#e8873a');
+      fur.addColorStop(1, '#b8621e');
+      ctx.fillStyle = fur;
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.45, u * 0.8, u * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 黑色虎纹。
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.lineWidth = u * 0.07;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        const yy = -u * (1.05 + i * 0.35);
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.7, yy);
+        ctx.quadraticCurveTo(0, yy + u * 0.12, u * 0.7, yy);
+        ctx.stroke();
+      }
+
+      // 粗壮手臂与利爪。
+      ctx.fillStyle = '#d4792a';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.85, -u * 1.5, u * 0.26, u * 0.6, 0.3, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.85, -u * 1.5, u * 0.26, u * 0.6, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f0ead0';
+      for (const side of [-1, 1]) {
+        for (let c = 0; c < 3; c++) {
+          ctx.beginPath();
+          ctx.moveTo(side * (u * 0.95 + c * u * 0.08), -u * 0.95);
+          ctx.lineTo(side * (u * 1.03 + c * u * 0.08), -u * 0.95);
+          ctx.lineTo(side * (u * 0.99 + c * u * 0.08), -u * 0.7);
+          ctx.fill();
+        }
+      }
+
+      // 虎头。
+      ctx.fillStyle = '#e8873a';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.5, u * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d4792a';
+      ctx.beginPath();
+      ctx.arc(-u * 0.36, -u * 2.85, u * 0.16, 0, Math.PI * 2);
+      ctx.arc(u * 0.36, -u * 2.85, u * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      // 额头王字纹。
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.lineWidth = u * 0.06;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.2, -u * 2.8);
+      ctx.lineTo(u * 0.2, -u * 2.8);
+      ctx.moveTo(-u * 0.16, -u * 2.68);
+      ctx.lineTo(u * 0.16, -u * 2.68);
+      ctx.moveTo(0, -u * 2.82);
+      ctx.lineTo(0, -u * 2.64);
+      ctx.stroke();
+      // 白吻部与獠牙。
+      ctx.fillStyle = '#f0e0c8';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 2.32, u * 0.26, u * 0.17, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2a1a0a';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.4, u * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.14, -u * 2.26);
+      ctx.lineTo(-u * 0.07, -u * 2.26);
+      ctx.lineTo(-u * 0.105, -u * 2.1);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(u * 0.14, -u * 2.26);
+      ctx.lineTo(u * 0.07, -u * 2.26);
+      ctx.lineTo(u * 0.105, -u * 2.1);
+      ctx.fill();
+      // 凶眼。
+      ctx.fillStyle = '#f2d13c';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.2, -u * 2.55, u * 0.1, u * 0.07, -0.3, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.2, -u * 2.55, u * 0.1, u * 0.07, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.2, -u * 2.55, u * 0.04, u * 0.06, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.2, -u * 2.55, u * 0.04, u * 0.06, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.5, u * 1.15, u * 1.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.6;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.6;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
+    function drawPeach(p) {
+      const sx = p.x - camera.x;
+      const sy = p.y - camera.y + Math.sin(p.pulse) * 3;
+      const r = 11 * (1 + Math.sin(p.pulse * 1.3) * 0.08);
+
+      ctx.save();
+      ctx.translate(sx, sy);
+      const skin = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.2);
+      skin.addColorStop(0, '#ffd9b0');
+      skin.addColorStop(0.55, '#f5a572');
+      skin.addColorStop(1, '#e07a63');
+      ctx.fillStyle = skin;
+      ctx.beginPath();
+      ctx.arc(-r * 0.28, 0, r * 0.72, 0, Math.PI * 2);
+      ctx.arc(r * 0.28, 0, r * 0.72, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#c95f55';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.6);
+      ctx.quadraticCurveTo(-r * 0.15, 0, 0, r * 0.65);
+      ctx.stroke();
+      ctx.fillStyle = '#4f7a35';
+      ctx.beginPath();
+      ctx.ellipse(r * 0.2, -r * 0.75, r * 0.34, r * 0.14, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawWindupRing(x, y, r) {
+      ctx.strokeStyle = `rgba(255, 45, 45, ${0.5 + Math.sin(frameCount * 0.5) * 0.3})`;
+      ctx.lineWidth = Math.max(2, r * 0.08);
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 狼妖：直立狼人（原点为脚底）。
+    function drawWolfChar(e, sx, sy) {
+      const r = e.radius;
+      const bob = Math.sin(frameCount * 0.12 + e.bob) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -r * 1.6, r * 1.9);
+
+      // 阴影。
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 鬃毛。
+      ctx.fillStyle = '#33333a';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 2.1, r * 0.72, r * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 双腿。
+      ctx.fillStyle = '#4c4c54';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.44, -r * 1.15);
+      ctx.quadraticCurveTo(-r * 0.6, -r * 0.55, -r * 0.5, 0);
+      ctx.lineTo(-r * 0.14, 0);
+      ctx.quadraticCurveTo(-r * 0.28, -r * 0.55, -r * 0.12, -r * 1.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(r * 0.44, -r * 1.15);
+      ctx.quadraticCurveTo(r * 0.6, -r * 0.55, r * 0.5, 0);
+      ctx.lineTo(r * 0.14, 0);
+      ctx.quadraticCurveTo(r * 0.28, -r * 0.55, r * 0.12, -r * 1.05);
+      ctx.closePath();
+      ctx.fill();
+
+      // 腰布。
+      ctx.fillStyle = '#5a3a28';
+      ctx.fillRect(-r * 0.45, -r * 1.28, r * 0.9, r * 0.18);
+
+      // 躯干。
+      const torso = ctx.createLinearGradient(0, -r * 2.3, 0, -r * 0.9);
+      torso.addColorStop(0, '#86868e');
+      torso.addColorStop(1, '#55555d');
+      ctx.fillStyle = torso;
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 1.55, r * 0.58, r * 0.68, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 手臂 + 利爪。
+      ctx.fillStyle = '#60606a';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.75, -r * 1.5, r * 0.22, r * 0.55, 0.35, 0, Math.PI * 2);
+      ctx.ellipse(r * 0.75, -r * 1.5, r * 0.22, r * 0.55, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#cfcfc0';
+      for (const side of [-1, 1]) {
+        for (let c = 0; c < 3; c++) {
+          ctx.beginPath();
+          ctx.moveTo(side * (r * 0.82 + c * r * 0.07), -r * 1.0);
+          ctx.lineTo(side * (r * 0.89 + c * r * 0.07), -r * 1.0);
+          ctx.lineTo(side * (r * 0.855 + c * r * 0.07), -r * 0.78);
+          ctx.fill();
+        }
+      }
+
+      // 狼头。
+      ctx.fillStyle = '#767680';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 2.4, r * 0.34, r * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#3c3c44';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.26, -r * 2.56);
+      ctx.lineTo(-r * 0.34, -r * 2.94);
+      ctx.lineTo(-r * 0.1, -r * 2.62);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(r * 0.26, -r * 2.56);
+      ctx.lineTo(r * 0.34, -r * 2.94);
+      ctx.lineTo(r * 0.1, -r * 2.62);
+      ctx.fill();
+      ctx.fillStyle = '#8d8d96';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 2.28, r * 0.2, r * 0.13, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e8e4d8';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.11, -r * 2.26);
+      ctx.lineTo(-r * 0.05, -r * 2.26);
+      ctx.lineTo(-r * 0.08, -r * 2.14);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(r * 0.11, -r * 2.26);
+      ctx.lineTo(r * 0.05, -r * 2.26);
+      ctx.lineTo(r * 0.08, -r * 2.14);
+      ctx.fill();
+      ctx.fillStyle = '#e8e8d0';
+      ctx.shadowColor = '#ffffcc';
+      ctx.shadowBlur = 5;
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.14, -r * 2.46, r * 0.06, r * 0.04, -0.35, 0, Math.PI * 2);
+      ctx.ellipse(r * 0.14, -r * 2.46, r * 0.06, r * 0.04, 0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.55;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 1.6, r * 0.95, r * 1.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+    }
+
+    // 蛇妖：盘尾蛇人——盘绕蛇尾、人身躯干、双臂、蛇头（原点为盘身底部）。
+    function drawSnakeChar(e, sx, sy) {
+      const r = e.radius;
+      const bob = Math.sin(frameCount * 0.15 + e.bob) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -r * 1.4, r * 2);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.1, r * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 盘绕的蛇尾。
+      ctx.fillStyle = '#3e6b34';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.3, r * 1.15, r * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4d8040';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.75, r * 0.9, r * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 人身躯干。
+      const torso = ctx.createLinearGradient(0, -r * 2.2, 0, -r * 0.8);
+      torso.addColorStop(0, '#5c9148');
+      torso.addColorStop(1, '#3e6b34');
+      ctx.fillStyle = torso;
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 1.5, r * 0.55, r * 0.62, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 腹甲浅纹。
+      ctx.strokeStyle = 'rgba(220, 235, 180, 0.5)';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.3, -r * (1.2 + i * 0.25));
+        ctx.quadraticCurveTo(0, -r * (1.12 + i * 0.25), r * 0.3, -r * (1.2 + i * 0.25));
+        ctx.stroke();
+      }
+
+      // 双臂带爪。
+      ctx.fillStyle = '#3e6b34';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.62, -r * 1.45, r * 0.16, r * 0.48, 0.4, 0, Math.PI * 2);
+      ctx.ellipse(r * 0.62, -r * 1.45, r * 0.16, r * 0.48, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d8e8c8';
+      for (const side of [-1, 1]) {
+        for (let c = 0; c < 3; c++) {
+          ctx.beginPath();
+          ctx.moveTo(side * (r * 0.72 + c * r * 0.06), -r * 1.02);
+          ctx.lineTo(side * (r * 0.78 + c * r * 0.06), -r * 1.02);
+          ctx.lineTo(side * (r * 0.75 + c * r * 0.06), -r * 0.84);
+          ctx.fill();
+        }
+      }
+
+      // 蛇头。
+      ctx.fillStyle = '#4d8040';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 2.4, r * 0.5, r * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 眼睛与信子。
+      ctx.fillStyle = '#f2d13c';
+      ctx.beginPath();
+      ctx.arc(-r * 0.2, -r * 2.48, r * 0.1, 0, Math.PI * 2);
+      ctx.arc(r * 0.2, -r * 2.48, r * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.2, -r * 2.48, r * 0.03, r * 0.08, 0, 0, Math.PI * 2);
+      ctx.ellipse(r * 0.2, -r * 2.48, r * 0.03, r * 0.08, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (Math.sin(frameCount * 0.2 + e.bob) > 0.3) {
+        ctx.strokeStyle = '#d33';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 2.3);
+        ctx.lineTo(0, -r * 2.0);
+        ctx.moveTo(0, -r * 2.0);
+        ctx.lineTo(-r * 0.1, -r * 1.88);
+        ctx.moveTo(0, -r * 2.0);
+        ctx.lineTo(r * 0.1, -r * 1.88);
+        ctx.stroke();
+      }
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.55;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 1.4, r * 1.1, r * 1.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+    }
+
+    // 石精：灰岩巨人全身——双腿、石躯、双臂石拳、头顶岩盔（原点为脚底）。
+    function drawGolemChar(e, sx, sy) {
+      const r = e.radius;
+      const bob = Math.sin(frameCount * 0.06 + e.bob) * 1.5;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -r * 1.4, r * 1.9);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.24)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.2, r * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 石腿。
+      ctx.fillStyle = '#6f6f73';
+      ctx.beginPath();
+      ctx.arc(-r * 0.42, -r * 0.3, r * 0.34, 0, Math.PI * 2);
+      ctx.arc(r * 0.42, -r * 0.3, r * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 石躯。
+      const rock = ctx.createRadialGradient(-r * 0.3, -r * 1.7, r * 0.2, 0, -r * 1.3, r * 1.4);
+      rock.addColorStop(0, '#9a9aa0');
+      rock.addColorStop(1, '#5c5c62');
+      ctx.fillStyle = rock;
+      ctx.beginPath();
+      ctx.arc(0, -r * 1.3, r * 1.05, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 双臂石拳。
+      ctx.fillStyle = '#6f6f73';
+      ctx.beginPath();
+      ctx.ellipse(-r * 1.1, -r * 1.25, r * 0.3, r * 0.55, 0.2, 0, Math.PI * 2);
+      ctx.ellipse(r * 1.1, -r * 1.25, r * 0.3, r * 0.55, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5c5c62';
+      ctx.beginPath();
+      ctx.arc(-r * 1.2, -r * 0.75, r * 0.34, 0, Math.PI * 2);
+      ctx.arc(r * 1.2, -r * 0.75, r * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 裂纹。
+      ctx.strokeStyle = 'rgba(40, 40, 45, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.4, -r * 2);
+      ctx.lineTo(-r * 0.1, -r * 1.5);
+      ctx.lineTo(-r * 0.35, -r * 1);
+      ctx.moveTo(r * 0.45, -r * 1.8);
+      ctx.lineTo(r * 0.2, -r * 1.3);
+      ctx.stroke();
+
+      // 苔痕。
+      ctx.fillStyle = 'rgba(90, 130, 70, 0.6)';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.5, -r * 0.9, r * 0.28, r * 0.16, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 头顶岩盔与发光双眼。
+      ctx.fillStyle = '#7a7a80';
+      ctx.beginPath();
+      ctx.arc(0, -r * 2.35, r * 0.48, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5c5c62';
+      ctx.beginPath();
+      ctx.arc(0, -r * 2.55, r * 0.3, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#ffbf40';
+      ctx.shadowColor = '#ffbf40';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(-r * 0.18, -r * 2.35, r * 0.09, 0, Math.PI * 2);
+      ctx.arc(r * 0.18, -r * 2.35, r * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.55;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 1.4, r * 1.3, r * 1.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+    }
+
+    // 黑风大王：完整黑熊精——后腿、毛躯、垂地双臂、熊头。
+    function drawBossBear(e, sx, sy) {
+      const u = e.radius * 1.15;
+      const bob = Math.sin(frameCount * 0.08) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.7, u * 2.1);
+
+      // 阴影。
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.25, u * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 后腿。
+      ctx.fillStyle = '#1d150e';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.42, -u * 0.5, u * 0.36, u * 0.55, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.42, -u * 0.5, u * 0.36, u * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 垂地双臂 + 白爪。
+      ctx.fillStyle = '#241a12';
+      ctx.beginPath();
+      ctx.ellipse(-u * 1.05, -u * 1.2, u * 0.3, u * 0.8, 0.22, 0, Math.PI * 2);
+      ctx.ellipse(u * 1.05, -u * 1.2, u * 0.3, u * 0.8, -0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e8e0d0';
+      for (const side of [-1, 1]) {
+        for (let c = 0; c < 3; c++) {
+          const bx = side * (u * 1.12 + c * u * 0.09);
+          ctx.beginPath();
+          ctx.moveTo(bx, -u * 0.5);
+          ctx.lineTo(bx + side * u * 0.08, -u * 0.5);
+          ctx.lineTo(bx + side * u * 0.04, -u * 0.28);
+          ctx.fill();
+        }
+      }
+
+      // 毛躯（带毛刺边缘）。
+      const fur = ctx.createRadialGradient(-u * 0.25, -u * 2, u * 0.2, 0, -u * 1.5, u * 1.5);
+      fur.addColorStop(0, '#3d2f22');
+      fur.addColorStop(1, '#211710');
+      ctx.fillStyle = fur;
+      ctx.beginPath();
+      const spikes = 30;
+      for (let i = 0; i < spikes; i++) {
+        const a1 = (i / spikes) * Math.PI * 2;
+        const a2 = ((i + 0.5) / spikes) * Math.PI * 2;
+        ctx.lineTo(Math.cos(a1) * u * 1.06, -u * 1.55 + Math.sin(a1) * u * 1.0);
+        ctx.lineTo(Math.cos(a2) * u * 1.16, -u * 1.55 + Math.sin(a2) * u * 1.1);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // 熊头。
+      const hy = -u * 2.75;
+      ctx.fillStyle = '#241a12';
+      ctx.beginPath();
+      ctx.arc(0, hy, u * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(-u * 0.4, hy - u * 0.42, u * 0.17, 0, Math.PI * 2);
+      ctx.arc(u * 0.4, hy - u * 0.42, u * 0.17, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#54402c';
+      ctx.beginPath();
+      ctx.arc(-u * 0.4, hy - u * 0.42, u * 0.08, 0, Math.PI * 2);
+      ctx.arc(u * 0.4, hy - u * 0.42, u * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 眼睛。
+      ctx.fillStyle = '#160e06';
+      ctx.beginPath();
+      ctx.arc(-u * 0.22, hy - u * 0.1, u * 0.07, 0, Math.PI * 2);
+      ctx.arc(u * 0.22, hy - u * 0.1, u * 0.07, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      ctx.arc(-u * 0.24, hy - u * 0.13, u * 0.025, 0, Math.PI * 2);
+      ctx.arc(u * 0.2, hy - u * 0.13, u * 0.025, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 吻部与黑鼻。
+      ctx.fillStyle = '#6e553a';
+      ctx.beginPath();
+      ctx.ellipse(0, hy + u * 0.22, u * 0.26, u * 0.18, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0d0906';
+      ctx.beginPath();
+      ctx.ellipse(0, hy + u * 0.12, u * 0.09, u * 0.06, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (e.state === 'windup') {
+        // 咆哮：张嘴露出暗红口腔与牙齿。
+        ctx.fillStyle = '#4a1208';
+        ctx.beginPath();
+        ctx.ellipse(0, hy + u * 0.38, u * 0.18, u * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e8e0d0';
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * u * 0.1 - u * 0.035, hy + u * 0.28);
+          ctx.lineTo(i * u * 0.1 + u * 0.035, hy + u * 0.28);
+          ctx.lineTo(i * u * 0.1, hy + u * 0.38);
+          ctx.fill();
+        }
+      } else {
+        ctx.strokeStyle = '#0d0906';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, hy + u * 0.18);
+        ctx.lineTo(0, hy + u * 0.32);
+        ctx.stroke();
+      }
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.6, u * 1.3, u * 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.4;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.8;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
+    function drawEnemy(e) {
+      const sx = e.x - camera.x;
+      const sy = e.y - camera.y;
+      if (sx < -120 || sy < -160 || sx > canvas.width + 120 || sy > canvas.height + 120) return;
+
+      // BOSS 大招蓄力：红光笼罩预警。
+      if (e.state === 'windup' && e.heavy) {
+        const pr = 1 + Math.sin(frameCount * 0.4) * 0.08;
+        ctx.fillStyle = 'rgba(255, 30, 30, 0.16)';
+        ctx.beginPath();
+        ctx.arc(sx, sy - e.radius * 1.4, e.radius * 2.3 * pr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 30, 30, 0.75)';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(sx, sy - e.radius * 1.4, e.radius * 2.3 * pr, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (e.isBoss) {
+        if (e.type === 'jinchi') drawJinchi(e, sx, sy);
+        else if (e.type === 'huangfeng') drawHuangfengBoss(e, sx, sy);
+        else if (e.type === 'shaguo') drawShaguo(e, sx, sy);
+        else if (e.type === 'shixian') drawShixian(e, sx, sy);
+        else if (e.type === 'huxian') drawHuxian(e, sx, sy);
+        else drawBossBear(e, sx, sy);
+      }
+      else if (e.type === 'wolf') drawWolfChar(e, sx, sy);
+      else if (e.type === 'snake') drawSnakeChar(e, sx, sy);
+      else if (e.type === 'rat') drawRatChar(e, sx, sy);
+      else drawGolemChar(e, sx, sy);
+
+      // 定身效果。
+      if (e.frozen > 0) {
+        ctx.fillStyle = 'rgba(140, 200, 255, 0.22)';
+        ctx.beginPath();
+        ctx.ellipse(sx, sy - e.radius * 1.4, e.radius * 1.3, e.radius * 1.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#9fd8ff';
+        ctx.font = `bold ${Math.max(14, e.radius * 0.7)}px serif`;
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = '#0a2a44';
+        ctx.lineWidth = 3;
+        const fy = sy - e.radius * 3.4;
+        ctx.strokeText('定', sx, fy);
+        ctx.fillText('定', sx, fy);
+        ctx.textAlign = 'left';
+      }
+    }
+
+    function drawPlayer() {
+      const sx = player.x - camera.x;
+      const sy = player.y - camera.y;
+      const r = player.r;
+
+      ctx.save();
+      ctx.translate(sx, sy);
+
+      // 阴影。
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.1, r * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 避火罩：金色护体光环。
+      if (player.hasMantle) {
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
+        ctx.beginPath();
+        ctx.arc(0, -r * 1.6, r * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255, 215, 0, ${0.4 + Math.sin(frameCount * 0.1) * 0.15})`;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, -r * 1.6, r * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 蓄力光环：金光环绕，满蓄时转白。
+      if (charge.charging) {
+        const lv = charge.level;
+        const pulse = 1 + Math.sin(frameCount * 0.3) * 0.06;
+        ctx.fillStyle = `rgba(255, 215, 0, ${0.07 + lv * 0.13})`;
+        ctx.beginPath();
+        ctx.arc(0, -r * 1.6, r * (1.6 + lv * 1.4) * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = lv >= 1 ? 'rgba(255, 255, 230, 0.95)' : 'rgba(255, 215, 0, 0.55)';
+        ctx.lineWidth = 2 + lv * 2;
+        ctx.beginPath();
+        ctx.arc(0, -r * 1.6, r * (1.6 + lv * 1.4) * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 三种棍式各有架势。
+      const st = STANCES[stanceIdx];
+      const swingP = staff.swinging ? 1 - staff.timer / staff.duration : 0;
+      let rel;
+      let lenVis;
+      if (st.kind === 'chop') {
+        rel = staff.swinging ? -1.6 + swingP * 2.1 : -0.6;
+        lenVis = st.range * 0.82;
+      } else if (st.kind === 'vault') {
+        rel = 0;
+        lenVis = staff.swinging
+          ? st.range * (0.7 + Math.sin(Math.min(swingP * 1.4, 1) * Math.PI * 0.5) * 0.65)
+          : st.range * 0.7;
+      } else {
+        rel = 0;
+        lenVis = staff.swinging
+          ? st.range * (0.3 + Math.sin(swingP * Math.PI) * 0.7)
+          : st.range * 0.55;
+      }
+
+      if (transform.active) {
+        // 广智变身：灰狼战士（保持原来的旋转朝向画法）。
+        ctx.save();
+        ctx.rotate(player.angle + Math.PI / 2);
+        ctx.fillStyle = '#33333a';
+        ctx.beginPath();
+        ctx.ellipse(0, r * 0.1, r * 0.95, r * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#6a6a72';
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.02, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#a3352c';
+        ctx.fillRect(-r, r * 0.15, r * 2, r * 0.3);
+
+        ctx.fillStyle = '#7d7d85';
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.42, r * 0.52, r * 0.42, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#3c3c44';
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.34, -r * 0.66);
+        ctx.lineTo(-r * 0.44, -r * 1.05);
+        ctx.lineTo(-r * 0.14, -r * 0.72);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(r * 0.34, -r * 0.66);
+        ctx.lineTo(r * 0.44, -r * 1.05);
+        ctx.lineTo(r * 0.14, -r * 0.72);
+        ctx.fill();
+        ctx.fillStyle = '#8d8d96';
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.72, r * 0.24, r * 0.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e8e8d0';
+        ctx.shadowColor = '#ffffcc';
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.2, -r * 0.5, r * 0.08, r * 0.05, -0.3, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.2, -r * 0.5, r * 0.08, r * 0.05, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 火焰刀。
+        ctx.save();
+        ctx.rotate(rel - Math.PI / 2);
+        ctx.shadowColor = '#ff7a2a';
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = '#ff6a2a';
+        ctx.lineWidth = 9;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-lenVis * 0.2, 0);
+        ctx.lineTo(lenVis, 0);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#ffd9a0';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(lenVis * 0.2, 0);
+        ctx.lineTo(lenVis, 0);
+        ctx.stroke();
+        if (frameCount % 3 === 0) {
+          const a = player.angle + rel;
+          particles.push({
+            x: player.x + Math.cos(a) * lenVis,
+            y: player.y + Math.sin(a) * lenVis,
+            vx: randomRange(-0.8, 0.8),
+            vy: randomRange(-1.6, -0.5),
+            life: 0.6,
+            color: frameCount % 2 ? '#ff8a3a' : '#ffcf6a',
+            size: randomRange(2, 4)
+          });
+        }
+        ctx.restore();
+        ctx.restore();
+      } else {
+        // 天命人：四肢齐全的行者，走动与攻击皆有动作。
+        const u = 13;
+        const wp = player.walkPhase;
+        const moving = player.moving;
+        const legSwing = moving ? Math.sin(wp) * u * 0.6 : 0;
+        const armSwing = moving ? Math.sin(wp) * 0.55 : 0;
+        if (player.facing < 0) ctx.scale(-1, 1);
+
+        const hipY = -u * 1.75;
+        const shoulderY = -u * 2.75;
+        const headY = -u * 3.5;
+
+        // 双腿（走动时交替迈步）。
+        ctx.strokeStyle = '#3d3020';
+        ctx.lineWidth = u * 0.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.3, hipY);
+        ctx.lineTo(-u * 0.3 + legSwing, -u * 0.15);
+        ctx.moveTo(u * 0.3, hipY);
+        ctx.lineTo(u * 0.3 - legSwing, -u * 0.15);
+        ctx.stroke();
+        // 布鞋。
+        ctx.fillStyle = '#241a10';
+        ctx.beginPath();
+        ctx.ellipse(-u * 0.3 + legSwing, -u * 0.1, u * 0.32, u * 0.14, 0, 0, Math.PI * 2);
+        ctx.ellipse(u * 0.3 - legSwing, -u * 0.1, u * 0.32, u * 0.14, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 行者袍。
+        const robe = ctx.createLinearGradient(0, shoulderY - 4, 0, hipY + 4);
+        robe.addColorStop(0, '#6b5a40');
+        robe.addColorStop(1, '#4a3c28');
+        ctx.fillStyle = robe;
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.62, shoulderY);
+        ctx.quadraticCurveTo(-u * 0.75, -u * 2.2, -u * 0.62, hipY);
+        ctx.lineTo(u * 0.62, hipY);
+        ctx.quadraticCurveTo(u * 0.75, -u * 2.2, u * 0.62, shoulderY);
+        ctx.closePath();
+        ctx.fill();
+        // 红绳腰带。
+        ctx.fillStyle = '#a3352c';
+        ctx.fillRect(-u * 0.68, -u * 1.95, u * 1.36, u * 0.28);
+
+        // 左臂（走动时前后摆动）。
+        ctx.strokeStyle = '#5a4a34';
+        ctx.lineWidth = u * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.6, shoulderY + 2);
+        ctx.lineTo(-u * 0.85 - armSwing * u * 0.4, -u * 1.7);
+        ctx.stroke();
+        ctx.fillStyle = '#d9b48c';
+        ctx.beginPath();
+        ctx.arc(-u * 0.85 - armSwing * u * 0.4, -u * 1.7, u * 0.16, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 右臂持棍：攻击、蓄力、行走各有架势。
+        const sxp = u * 0.6;
+        let armA;
+        let staffA;
+        if (staff.swinging) {
+          if (st.kind === 'chop') {
+            // 劈棍：举臂过顶劈落。
+            armA = -2.5 + swingP * 2.9;
+            staffA = armA + 0.5;
+          } else if (st.kind === 'vault') {
+            // 立棍：拄棍向地。
+            armA = 0.35;
+            staffA = 0.35;
+          } else {
+            // 戳棍：拧臂前刺。
+            armA = -0.1;
+            staffA = 0;
+          }
+        } else if (charge.charging) {
+          // 蓄力：棍举过肩，金光渐盛。
+          armA = -2.2 - charge.level * 0.5;
+          staffA = armA + 0.4;
+        } else {
+          armA = -0.6 + armSwing * 0.5;
+          staffA = -0.6 + (moving ? Math.sin(wp) * 0.1 : Math.sin(frameCount * 0.03) * 0.04);
+        }
+        const handX = sxp + Math.cos(armA) * u * 1.1;
+        const handY = shoulderY + 2 + Math.sin(armA) * u * 1.1;
+        ctx.beginPath();
+        ctx.moveTo(sxp, shoulderY + 2);
+        ctx.lineTo(handX, handY);
+        ctx.stroke();
+        ctx.fillStyle = '#d9b48c';
+        ctx.beginPath();
+        ctx.arc(handX, handY, u * 0.16, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 金箍棒。
+        const drawLen = Math.min(lenVis, 120);
+        ctx.save();
+        ctx.translate(handX, handY);
+        ctx.rotate(staffA);
+        if (player.empowered || (staff.swinging && staff.power > 1.4) || charge.charging) {
+          ctx.shadowColor = '#ffd700';
+          ctx.shadowBlur = staff.swinging && staff.power > 1.4 ? 24 : 14;
+        }
+        ctx.strokeStyle = '#6e4426';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-drawLen * 0.3, 0);
+        ctx.lineTo(drawLen, 0);
+        ctx.stroke();
+        ctx.strokeStyle = '#b18f3a';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(drawLen - 11, 0);
+        ctx.lineTo(drawLen, 0);
+        ctx.stroke();
+        ctx.restore();
+
+        // 猴头：猴脸、双耳、金箍、双眼。
+        ctx.fillStyle = '#8a6a48';
+        ctx.beginPath();
+        ctx.arc(0, headY, u * 0.52, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(-u * 0.48, headY, u * 0.14, 0, Math.PI * 2);
+        ctx.arc(u * 0.48, headY, u * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#d9b48c';
+        ctx.beginPath();
+        ctx.ellipse(0, headY + u * 0.1, u * 0.38, u * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, headY - u * 0.12, u * 0.5, -Math.PI * 0.82, -Math.PI * 0.18);
+        ctx.stroke();
+        ctx.fillStyle = '#1a1208';
+        ctx.beginPath();
+        ctx.arc(-u * 0.15, headY + u * 0.02, u * 0.06, 0, Math.PI * 2);
+        ctx.arc(u * 0.15, headY + u * 0.02, u * 0.06, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+      // 蓄力条。
+      if (charge.charging) {
+        const bw = 54;
+        const bx = sx - bw / 2;
+        const by = sy - r * 3.4;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(bx - 2, by - 2, bw + 4, 10);
+        ctx.fillStyle = charge.level >= 1 ? '#fff2b0' : '#ffd700';
+        ctx.fillRect(bx, by, bw * charge.level, 6);
+        ctx.strokeStyle = '#d4af37';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx, by, bw, 6);
+      }
+    }
+
+    function drawSlashes() {
+      for (const s of slashes) {
+        const sx = s.x - camera.x;
+        const sy = s.y - camera.y;
+        const glow = s.fire ? '#ff8a3a' : (s.power > 1.5 ? '#fff2b0' : '#ffe9a8');
+        ctx.globalAlpha = s.life * 0.65;
+        ctx.strokeStyle = glow;
+        ctx.lineCap = 'round';
+        ctx.shadowColor = s.fire ? '#ff6a2a' : '#ffd700';
+        ctx.shadowBlur = 12;
+
+        if (s.kind === 'thrust') {
+          // 戳棍：一线疾刺。
+          ctx.lineWidth = (5 + (1 - s.life) * 3) * (s.power > 1.5 ? 1.6 : 1);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + Math.cos(s.angle) * s.range, sy + Math.sin(s.angle) * s.range);
+          ctx.stroke();
+        } else if (s.kind === 'vault') {
+          // 立棍：落点荡开的金环。
+          const t = 1 - s.life;
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          ctx.arc(s.tx - camera.x, s.ty - camera.y, 20 + t * s.radius, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // 劈棍：凌厉的窄弧劈痕。
+          ctx.lineWidth = 6 + (1 - s.life) * 5;
+          ctx.beginPath();
+          ctx.arc(sx, sy, s.range * (1.02 - s.life * 0.12), s.angle - s.arc / 2, s.angle + s.arc / 2);
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawSkillFx() {
+      for (const fx of skillFx) {
+        if (fx.type === 'ring') {
+          const t = 1 - fx.life;
+          ctx.strokeStyle = `rgba(255, 215, 0, ${fx.life * 0.8})`;
+          ctx.lineWidth = 8 * fx.life + 2;
+          ctx.beginPath();
+          ctx.arc(fx.x - camera.x, fx.y - camera.y, 30 + t * 180, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (fx.type === 'beam') {
+          ctx.strokeStyle = `rgba(255, 120, 40, ${fx.life})`;
+          ctx.lineWidth = 10 * fx.life + 3;
+          ctx.lineCap = 'round';
+          ctx.shadowColor = '#ffdd55';
+          ctx.shadowBlur = 16;
+          ctx.beginPath();
+          ctx.moveTo(fx.x1 - camera.x, fx.y1 - camera.y);
+          ctx.lineTo(fx.x2 - camera.x, fx.y2 - camera.y);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        } else if (fx.type === 'crack') {
+          // 重击落地：地面裂纹。
+          const cx = fx.x - camera.x;
+          const cy = fx.y - camera.y;
+          ctx.strokeStyle = `rgba(40, 30, 20, ${fx.life * 0.8})`;
+          ctx.lineWidth = 3;
+          ctx.lineCap = 'round';
+          const spread = 34 * (1.3 - fx.life);
+          for (let i = -1; i <= 1; i++) {
+            const a = fx.angle + i * 0.55;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(a) * spread, cy + Math.sin(a) * spread);
+            ctx.stroke();
+          }
+        } else if (fx.type === 'shock') {
+          // 砸地冲击波：红色扩散环。
+          const t = 1 - fx.life;
+          ctx.strokeStyle = `rgba(255, 45, 45, ${fx.life * 0.85})`;
+          ctx.lineWidth = 8 * fx.life + 3;
+          ctx.beginPath();
+          ctx.arc(fx.x - camera.x, fx.y - camera.y, 20 + t * (fx.max || 170), 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (fx.type === 'freezewave') {
+          ctx.fillStyle = `rgba(150, 210, 255, ${fx.life * 0.15})`;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    }
+
+    function drawProjectiles() {
+      for (const p of projectiles) {
+        const sx = p.x - camera.x;
+        const sy = p.y - camera.y;
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.heavy ? '#ff2020' : p.color;
+        ctx.shadowBlur = p.heavy ? 22 : 10;
+        ctx.beginPath();
+        ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        if (p.heavy) {
+          // 大招弹：红光环绕。
+          ctx.strokeStyle = 'rgba(255, 40, 40, 0.85)';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(sx, sy, p.radius + 4 + Math.sin(frameCount * 0.4) * 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawParticles() {
+      for (const p of particles) {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x - camera.x, p.y - camera.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawDamageTexts() {
+      for (const t of damageTexts) {
+        ctx.globalAlpha = t.life;
+        ctx.fillStyle = t.color;
+        ctx.font = 'bold 18px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.strokeText(t.damage, t.x - camera.x, t.y - camera.y);
+        ctx.fillText(t.damage, t.x - camera.x, t.y - camera.y);
+        ctx.textAlign = 'left';
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawCombo() {
+      if (combo.count < 2 || combo.timer <= 0) return;
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+      const text = `连击 x${combo.count}`;
+      ctx.strokeText(text, canvas.width / 2, 46);
+      ctx.fillText(text, canvas.width / 2, 46);
+      ctx.textAlign = 'left';
+    }
+
+    function drawHurtFlash() {
+      if (player.hurtCooldown <= 25) return;
+      const alpha = (player.hurtCooldown - 25) / 20 * 0.3;
+      ctx.fillStyle = `rgba(180, 20, 20, ${alpha})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawBanner() {
+      if (!banner) return;
+      const alpha = Math.min(1, banner.timer / 40);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 34px serif';
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 5;
+      ctx.strokeText(banner.text, canvas.width / 2, 220);
+      ctx.fillText(banner.text, canvas.width / 2, 220);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGround();
+      drawDecor();
+      if (currentMap === 'forest') {
+        for (const b of bells) drawBell(b);
+      }
+      for (const p of peaches) drawPeach(p);
+
+      // 按 y 排序绘制，制造前后遮挡关系。
+      const drawList = enemies.map(e => ({ y: e.y, draw: () => drawEnemy(e) }));
+      drawList.push({ y: player.y, draw: drawPlayer });
+      drawList.sort((a, b) => a.y - b.y);
+      for (const item of drawList) item.draw();
+
+      drawSlashes();
+      drawProjectiles();
+      drawParticles();
+      drawSkillFx();
+      drawDamageTexts();
+      drawCombo();
+      drawBanner();
+      drawHurtFlash();
+    }
+
+    function gameLoop() {
+      if (!gameRunning) return;
+
+      frameCount++;
+      updatePlayer();
+      updateStaff();
+      updateSkills();
+      updateEnemies();
+      updatePeaches();
+      updateBells();
+      updateProjectiles();
+      updateParticles();
+      updateSlashes();
+      updateDamageTexts();
+      draw();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver(win) {
+      gameRunning = false;
+      overlayTitle.textContent = win ? '功德圆满' : '天命人陨落';
+      overlayTitle.style.color = win ? '#ffd700' : '#e94560';
+      overlayMsg.textContent = win
+        ? `你击败了黄风大圣，第二章完！第三章敬请期待。最终得分: ${score}`
+        : checkpoint ? `最终得分: ${score}（将在黄风岭存档点复活）` : `最终得分: ${score}`;
+      overlay.style.display = 'block';
+    }
+
+    function restartGame() {
+      // 有存档点则于存档点复活，否则从头开始。
+      if (checkpoint && checkpoint.map === 'huangfeng' && currentMap === 'huangfeng') {
+        respawnAtCheckpoint();
+        return;
+      }
+      initGame();
+      gameLoop();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.key] = true;
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+        e.preventDefault();
+      }
+      if (e.key === ' ') {
+        startCharge();
+      }
+      if (e.key === 'j' || e.key === 'J') {
+        startSwing(1);
+      }
+      if (e.key === '1') castFreeze();
+      if (e.key === '2') castSweep();
+      if (e.key === '3') castFire();
+      if (e.key === '4') castTransform();
+      if (e.key === 'q' || e.key === 'Q') {
+        stanceIdx = (stanceIdx + 1) % STANCES.length;
+        stanceNameEl.textContent = STANCES[stanceIdx].name;
+      }
+      if (e.key === 'Shift') {
+        const dx = player.moveDx || Math.cos(player.angle);
+        const dy = player.moveDy || Math.sin(player.angle);
+        startDodge(dx, dy);
+      }
+      if ((e.key === 'r' || e.key === 'R') && !gameRunning) {
+        restartGame();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.key] = false;
+      if (e.key === ' ') releaseCharge();
+    });
+
+    canvas.addEventListener('mousedown', () => {
+      startSwing(1);
+    });
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    resizeCanvas();
+    initGame();
+    gameLoop();
+  </script>
+</body>
+</html>
