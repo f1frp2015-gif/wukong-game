@@ -229,6 +229,8 @@
       <div class="skill" id="skill-sweep"><span class="key">2</span>横扫六合<span class="cd"></span></div>
       <div class="skill" id="skill-fire"><span class="key">3</span>火眼金睛<span class="cd"></span></div>
       <div class="skill" id="skill-transform"><span class="key">4</span>广智变身<span class="cd"></span></div>
+      <div class="skill" id="skill-pearl" style="display:none"><span class="key">5</span>定风珠<span class="cd"></span></div>
+      <div class="skill" id="slot-sober" style="display:none"><span class="key">石</span>醒酒石</div>
       <div class="skill" id="skill-mantle" style="display:none"><span class="key">宝</span>避火罩</div>
     </div>
   </div>
@@ -302,7 +304,8 @@
       freeze: { cd: 0, maxCd: 720, el: document.getElementById('skill-freeze') },
       sweep: { cd: 0, maxCd: 480, el: document.getElementById('skill-sweep') },
       fire: { cd: 0, maxCd: 900, el: document.getElementById('skill-fire') },
-      transform: { cd: 0, maxCd: 1500, el: document.getElementById('skill-transform') }
+      transform: { cd: 0, maxCd: 1500, el: document.getElementById('skill-transform') },
+      pearl: { cd: 0, maxCd: 1800, el: document.getElementById('skill-pearl') }
     };
     // 广智变身：化为狼战士，攻击翻倍、移动加速，持续一分钟且期间无敌。
     const transform = { active: false, timer: 0, duration: 3600, dmgMult: 2, speedMult: 1.3 };
@@ -331,6 +334,19 @@
     let returnCountdown = 0;
     let chapterCountdown = 0;
     let checkpoint = null;
+    let huangfengState = null;
+    let ally = null;
+    let pigNpc = null;
+    let sahaliCountdown = 0;
+    let pearlCountdown = 0;
+    let introPhase = null;
+    let introTimer = 0;
+    let introCountdown = 0;
+    let tudigong = null;
+    let icelakePhase = null;
+    let icelakeTimer = 0;
+    let huangmei = null;
+    let ch3EndCountdown = 0;
     let score = 0;
     let kills = 0;
     let bossActive = false;
@@ -562,9 +578,151 @@
       if (templeCountdown > 0 && --templeCountdown === 0) enterTemple();
       if (returnCountdown > 0 && --returnCountdown === 0) exitTemple();
       if (chapterCountdown > 0 && --chapterCountdown === 0) enterHuangfeng();
-      if (nextBossCountdown > 0 && --nextBossCountdown === 0) {
+      // BOSS 队列只在黄风岭推进（离开去斯哈里国时暂停）。
+      if (currentMap === 'huangfeng' && nextBossCountdown > 0 && --nextBossCountdown === 0) {
         chapter2BossIdx++;
         spawnChapterBoss();
+      }
+      if (sahaliCountdown > 0 && --sahaliCountdown === 0) enterSahali();
+      if (pearlCountdown > 0 && --pearlCountdown === 0) exitSahali();
+      if (introCountdown > 0 && --introCountdown === 0) startChapter3Intro();
+      if (ch3EndCountdown > 0 && --ch3EndCountdown === 0) endChapter3();
+    }
+
+    // 第三章开场：雪原直路 → 遇小西天土地 → 化蝠飞往小西天。
+    function startChapter3Intro() {
+      currentMap = 'intro';
+      introPhase = 'walk';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      tudigong = null;
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 200;
+      player.hp = player.maxHp;
+      banner = { text: '第三章 · 小西天', timer: 170 };
+      updateUI();
+    }
+
+    function updateIntro() {
+      if (currentMap !== 'intro') return;
+      if (introPhase === 'walk') {
+        // 沿着直路走到尽头，遇见小西天土地。
+        if (player.y < 320) {
+          introPhase = 'meet';
+          introTimer = 210;
+          tudigong = { x: WORLD.w / 2, y: 240 };
+          banner = { text: '小西天土地：天命人，前方路险雪深，且随老朽来！', timer: 200 };
+        }
+      } else if (introPhase === 'meet') {
+        if (--introTimer <= 0) {
+          introPhase = 'transform';
+          introTimer = 150;
+          banner = { text: '摇身一变，化作蝙蝠！', timer: 140 };
+          createParticles(player.x, player.y - 30, '#9fd8ff', 22);
+        }
+      } else if (introPhase === 'transform') {
+        if (--introTimer <= 0) {
+          introPhase = 'fly';
+          banner = { text: '跟着土地公，飞往小西天！', timer: 140 };
+        }
+      } else if (introPhase === 'fly') {
+        // 与土地公一同飞往小西天。
+        player.y -= 2.6;
+        player.x += (WORLD.w / 2 - player.x) * 0.05;
+        if (tudigong) tudigong.y -= 2.6;
+        if (player.y < 140) enterIcelake();
+      }
+    }
+
+    // 第三章主场景：冰湖（存档点），黄眉以后天袋召唤亢金龙。
+    function enterIcelake() {
+      currentMap = 'icelake';
+      introPhase = null;
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      ally = null;
+      tudigong = null;
+      checkpoint = { map: 'icelake' };
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 260;
+      player.hp = player.maxHp;
+      huangmei = { x: WORLD.w / 2, y: 360 };
+      icelakePhase = 'arrive';
+      icelakeTimer = 150;
+      banner = { text: '小西天 · 冰湖（存档点）', timer: 150 };
+      for (let i = 0; i < 3; i++) {
+        peaches.push({
+          x: randomRange(300, WORLD.w - 300),
+          y: randomRange(500, WORLD.h - 300),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      updateUI();
+    }
+
+    function endChapter3() {
+      gameRunning = false;
+      overlayTitle.textContent = '第三章 · 冰湖';
+      overlayTitle.style.color = '#9fd8ff';
+      overlayMsg.textContent = `你击败了亢金龙，第三章完！敬请期待后续。最终得分: ${score}`;
+      overlay.style.display = 'block';
+    }
+
+    function spawnKangjinlong() {
+      enemies.push({
+        type: 'kanglong',
+        name: '亢金龙',
+        x: WORLD.w / 2,
+        y: 520,
+        radius: 34,
+        hp: 2000,
+        maxHp: 2000,
+        dmg: 42,
+        speed: 1.5,
+        aggro: 9999,
+        isBoss: true,
+        atk: 'melee',
+        atkCycle: ['melee', 'ranged', 'lunge'],
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'chase',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0
+      });
+      bossActive = true;
+      banner = { text: '亢金龙 现身！', timer: 150 };
+      // 后天袋开口的特效。
+      skillFx.push({ type: 'ring', x: huangmei.x, y: huangmei.y, life: 1 });
+      createParticles(WORLD.w / 2, 520, '#9fd8ff', 26);
+      updateUI();
+    }
+
+    function updateIcelake() {
+      if (currentMap !== 'icelake') return;
+      if (icelakePhase === 'arrive' && --icelakeTimer <= 0) {
+        icelakePhase = 'meet';
+        icelakeTimer = 160;
+        banner = { text: '黄眉：哪里来的猢狲，敢闯小西天！', timer: 150 };
+      } else if (icelakePhase === 'meet' && --icelakeTimer <= 0) {
+        icelakePhase = 'summon';
+        icelakeTimer = 150;
+        banner = { text: '黄眉：后天袋一开——亢金龙何在！', timer: 140 };
+      } else if (icelakePhase === 'summon' && --icelakeTimer <= 0) {
+        icelakePhase = 'fight';
+        spawnKangjinlong();
       }
     }
 
@@ -646,6 +804,8 @@
       chapter2BossIdx = 0;
       nextBossCountdown = 0;
       spawnChapterBoss();
+      // 黄袍员外（猪 NPC）守在地图最右侧，完成支线后消失。
+      pigNpc = player.sahaliDone ? null : { x: WORLD.w - 180, y: WORLD.h / 2 + 100 };
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 260;
       player.hp = player.maxHp;
@@ -667,6 +827,132 @@
       banner = { text: '于黄风岭存档点复活', timer: 140 };
       gameRunning = true;
       gameLoop();
+    }
+
+    // 隐藏 BOSS：蝜蝂（巨甲虫）。
+    function spawnFuban() {
+      enemies.push({
+        type: 'fuban',
+        name: '蝜蝂',
+        x: WORLD.w / 2,
+        y: 460,
+        radius: 40,
+        hp: 1800,
+        maxHp: 1800,
+        dmg: 38,
+        speed: 1.2,
+        aggro: 9999,
+        isBoss: true,
+        atk: 'melee',
+        atkCycle: ['melee', 'lunge'],
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'chase',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0
+      });
+      bossActive = true;
+    }
+
+    function enterSahali() {
+      // 保存黄风岭进度，进入隐藏地图斯哈里国。
+      huangfengState = { enemies, peaches, chapter2BossIdx, nextBossCountdown, px: player.x, py: player.y };
+      currentMap = 'sahali';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      for (let i = 0; i < 3; i++) {
+        peaches.push({
+          x: randomRange(300, WORLD.w - 300),
+          y: randomRange(700, WORLD.h - 300),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 280;
+      spawnFuban();
+      // 黄风大圣作为盟友并肩作战。
+      ally = {
+        x: WORLD.w / 2 + 120,
+        y: WORLD.h - 300,
+        radius: 32,
+        bob: 0,
+        state: 'idle',
+        windupVis: 0,
+        flash: 0,
+        frozen: 0,
+        noBar: true,
+        attackCd: 0
+      };
+      banner = { text: '斯哈里国 · 与黄风大圣并肩作战！', timer: 170 };
+      updateUI();
+    }
+
+    function exitSahali() {
+      currentMap = 'huangfeng';
+      enemies = huangfengState.enemies;
+      peaches = huangfengState.peaches;
+      chapter2BossIdx = huangfengState.chapter2BossIdx;
+      nextBossCountdown = huangfengState.nextBossCountdown;
+      player.x = huangfengState.px;
+      player.y = huangfengState.py;
+      huangfengState = null;
+      ally = null;
+      player.sahaliDone = true;
+      pigNpc = null;
+      bossActive = enemies.some(e => e.isBoss && e.state !== 'idle');
+      banner = { text: '回到了黄风岭', timer: 140 };
+      updateUI();
+    }
+
+    // 盟友黄风大圣：追击隐藏 BOSS 并挥叉攻击。
+    function updateAlly() {
+      if (!ally) return;
+      const boss = enemies.find(e => e.isBoss);
+      if (!boss) return;
+      const dx = boss.x - ally.x;
+      const dy = boss.y - ally.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 130) {
+        ally.x += (dx / dist) * 2.1;
+        ally.y += (dy / dist) * 2.1;
+      }
+      if (ally.attackCd > 0) ally.attackCd--;
+      if (ally.windupVis > 0) ally.windupVis--;
+      ally.state = ally.windupVis > 0 ? 'windup' : 'idle';
+      if (dist < 150 && ally.attackCd <= 0) {
+        ally.attackCd = 55;
+        ally.windupVis = 10;
+        applyDamage(boss, 15);
+        createParticles(boss.x, boss.y - boss.radius, '#ffd24a', 6);
+        handleKills();
+      }
+    }
+
+    // 黄袍员外：醉卧在黄风岭最右侧，给他醒酒石即可开启斯哈里国。
+    function updatePigNpc() {
+      if (currentMap !== 'huangfeng' || !pigNpc) return;
+      const dist = Math.hypot(player.x - pigNpc.x, player.y - pigNpc.y);
+      if (dist > 90) return;
+      if (player.hasSoberStone) {
+        player.hasSoberStone = false;
+        document.getElementById('slot-sober').style.display = 'none';
+        banner = { text: '黄袍员外酒醒了！前往斯哈里国……', timer: 160 };
+        sahaliCountdown = 150;
+      } else if (frameCount % 150 === 0) {
+        createDamageText(pigNpc.x, pigNpc.y - 60, '醉……若有醒酒石……', '#e8d9a8');
+      }
     }
 
     function scatterWorld() {
@@ -783,6 +1069,24 @@
       checkpoint = null;
       chapter2BossIdx = 0;
       nextBossCountdown = 0;
+      huangfengState = null;
+      ally = null;
+      pigNpc = null;
+      sahaliCountdown = 0;
+      pearlCountdown = 0;
+      player.hasSoberStone = false;
+      player.hasWindPearl = false;
+      player.sahaliDone = false;
+      introPhase = null;
+      introTimer = 0;
+      introCountdown = 0;
+      tudigong = null;
+      icelakePhase = null;
+      icelakeTimer = 0;
+      huangmei = null;
+      ch3EndCountdown = 0;
+      document.getElementById('slot-sober').style.display = 'none';
+      document.getElementById('skill-pearl').style.display = 'none';
       player.hasMantle = false;
       document.getElementById('skill-mantle').style.display = 'none';
       gameRunning = true;
@@ -886,14 +1190,38 @@
           }
           if (currentMap === 'huangfeng') {
             if (e.name === '黄风大圣') {
-              // 第二章通关。
+              // 第二章通关：进入第三章开场剧情。
+              banner = { text: '黄风大圣已灭！', timer: 150 };
+              introCountdown = 190;
               updateUI();
-              gameOver(true);
-              return true;
+              return false;
             }
             // BOSS 逐一现身：击败当前 BOSS 后，下一位稍后出现。
-            banner = { text: `${e.name}已灭！`, timer: 130 };
+            if (e.name === '石先锋') {
+              // 获得醒酒石，可唤醒最右侧的黄袍员外。
+              player.hasSoberStone = true;
+              document.getElementById('slot-sober').style.display = 'block';
+              banner = { text: '石先锋已灭！获得【醒酒石】', timer: 160 };
+            } else {
+              banner = { text: `${e.name}已灭！`, timer: 130 };
+            }
             nextBossCountdown = 160;
+            updateUI();
+            return false;
+          }
+          if (e.name === '蝜蝂') {
+            // 隐藏副本通关：获得定风珠，回到黄风岭。
+            player.hasWindPearl = true;
+            document.getElementById('skill-pearl').style.display = 'block';
+            banner = { text: '获得法宝【定风珠】！', timer: 170 };
+            pearlCountdown = 220;
+            updateUI();
+            return false;
+          }
+          if (e.name === '亢金龙') {
+            // 第三章 BOSS 已灭。
+            banner = { text: '亢金龙已灭！', timer: 150 };
+            ch3EndCountdown = 190;
             updateUI();
             return false;
           }
@@ -1026,6 +1354,16 @@
       createParticles(player.x, player.y, '#ff7a2a', 24);
     }
 
+    // 定风珠：定住全场妖怪 10 秒。
+    function castPearl() {
+      const s = skills.pearl;
+      if (!player.hasWindPearl || s.cd > 0 || !gameRunning || enemies.length === 0) return;
+      s.cd = s.maxCd;
+      for (const e of enemies) e.frozen = 600;
+      skillFx.push({ type: 'freezewave', life: 1 });
+      banner = { text: '定风珠！群妖镇住 10 秒', timer: 100 };
+    }
+
     function updateSkills() {
       for (const k in skills) {
         const s = skills[k];
@@ -1103,6 +1441,14 @@
       if (keys['a'] || keys['A'] || keys['ArrowLeft']) mx -= 1;
       if (keys['d'] || keys['D'] || keys['ArrowRight']) mx += 1;
 
+      // 剧情阶段（相遇/变身/飞行）锁定移动；直路阶段只能沿路走。
+      if (currentMap === 'intro') {
+        if (introPhase !== 'walk') {
+          mx = 0;
+          my = 0;
+        }
+      }
+
       if (mx !== 0 || my !== 0) {
         const len = Math.hypot(mx, my);
         mx /= len;
@@ -1134,6 +1480,10 @@
 
       player.x = clamp(player.x, player.r, WORLD.w - player.r);
       player.y = clamp(player.y, player.r, WORLD.h - player.r);
+      // 直路只能在路中央走。
+      if (currentMap === 'intro' && introPhase === 'walk') {
+        player.x = clamp(player.x, WORLD.w / 2 - 130, WORLD.w / 2 + 130);
+      }
 
       if (player.hurtCooldown > 0) player.hurtCooldown--;
       if (combo.timer > 0) {
@@ -1356,6 +1706,144 @@
     // ---------- 绘制 ----------
 
     function drawGround() {
+      if (currentMap === 'icelake') {
+        // 冰湖：蓝白冰面，裂纹纵横，远处雪山。
+        ctx.fillStyle = '#b8d4e4';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // 冰面裂纹。
+        ctx.strokeStyle = 'rgba(110, 150, 175, 0.5)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 60; i++) {
+          const gx = seeded(i + 11000) * WORLD.w;
+          const gy = seeded(i + 11400) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) continue;
+          const a = seeded(i + 11800) * Math.PI;
+          ctx.beginPath();
+          ctx.moveTo(sx - 20 * Math.cos(a), sy - 20 * Math.sin(a));
+          ctx.lineTo(sx + 20 * Math.cos(a), sy + 20 * Math.sin(a));
+          ctx.stroke();
+        }
+        // 雪堆。
+        for (let i = 0; i < 80; i++) {
+          const gx = seeded(i + 12200) * WORLD.w;
+          const gy = seeded(i + 12600) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) continue;
+          ctx.fillStyle = 'rgba(240, 246, 250, 0.6)';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 24 + seeded(i) * 30, 10 + seeded(i + 1) * 14, seeded(i + 2) * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // 远处雪山（世界顶部）。
+        const my = 120 - camera.y;
+        if (my > -240 && my < canvas.height + 60) {
+          ctx.fillStyle = '#8aa4b8';
+          for (let i = 0; i < 8; i++) {
+            const mx = i * 320 - 100 - camera.x;
+            ctx.beginPath();
+            ctx.moveTo(mx - 140, my + 60);
+            ctx.lineTo(mx, my - 90 - seeded(i + 13000) * 60);
+            ctx.lineTo(mx + 140, my + 60);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#eef4f8';
+            ctx.beginPath();
+            ctx.moveTo(mx - 40, my - 40 - seeded(i + 13000) * 30);
+            ctx.lineTo(mx, my - 90 - seeded(i + 13000) * 60);
+            ctx.lineTo(mx + 40, my - 40 - seeded(i + 13000) * 30);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#8aa4b8';
+          }
+        }
+        return;
+      }
+
+      if (currentMap === 'intro') {
+        // 雪原直路：两侧暗山壁夹着一条雪路。
+        ctx.fillStyle = '#dce6ee';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const pcx = WORLD.w / 2 - camera.x;
+        const half = 150;
+        ctx.fillStyle = '#4a5560';
+        ctx.fillRect(0, 0, pcx - half, canvas.height);
+        ctx.fillRect(pcx + half, 0, canvas.width - (pcx + half), canvas.height);
+        // 山壁岩石。
+        ctx.fillStyle = '#3d4852';
+        for (let i = 0; i < 50; i++) {
+          const ry = seeded(i + 9800) * WORLD.h - camera.y;
+          if (ry < -60 || ry > canvas.height + 60) continue;
+          const left = seeded(i) > 0.5;
+          const rx = left ? pcx - half - 20 - seeded(i + 1) * 140 : pcx + half + 20 + seeded(i + 1) * 140;
+          ctx.beginPath();
+          ctx.ellipse(rx, ry, 32, 18, seeded(i + 2) * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // 雪路纹理。
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 40; i++) {
+          const ry = seeded(i + 10100) * WORLD.h - camera.y;
+          const rx = pcx - half + 30 + seeded(i + 10200) * (half * 2 - 60);
+          if (ry < -10 || ry > canvas.height + 10) continue;
+          ctx.beginPath();
+          ctx.moveTo(rx - 8, ry);
+          ctx.lineTo(rx + 8, ry);
+          ctx.stroke();
+        }
+        // 飞行阶段：云雾飞速掠过。
+        if (introPhase === 'fly') {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+          for (let i = 0; i < 10; i++) {
+            const cx = seeded(i + 9900) * canvas.width;
+            const cy = ((seeded(i + 9950) * canvas.height * 1.5 + frameCount * 6) % (canvas.height + 200)) - 100;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, 60, 18, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx + 40, cy + 6, 40, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        return;
+      }
+
+      if (currentMap === 'sahali') {
+        // 斯哈里国：黄沙宫殿废墟。
+        ctx.fillStyle = '#c2a26e';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // 残存石板。
+        ctx.strokeStyle = 'rgba(120, 95, 60, 0.5)';
+        ctx.lineWidth = 2;
+        const tile2 = 130;
+        const ox2 = -(camera.x % tile2);
+        const oy2 = -(camera.y % tile2);
+        ctx.beginPath();
+        for (let x = ox2; x < canvas.width; x += tile2) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+        }
+        for (let y = oy2; y < canvas.height; y += tile2) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+        for (let i = 0; i < 200; i++) {
+          const gx = seeded(i + 8200) * WORLD.w;
+          const gy = seeded(i + 8600) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -80 || sy < -80 || sx > canvas.width + 80 || sy > canvas.height + 80) continue;
+          ctx.fillStyle = seeded(i + 9000) > 0.5 ? 'rgba(160, 128, 82, 0.4)' : 'rgba(215, 185, 130, 0.35)';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 30 + seeded(i + 1) * 50, 14 + seeded(i + 2) * 22, seeded(i + 3) * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        return;
+      }
+
       if (currentMap === 'huangfeng') {
         // 黄风岭：漫漫黄沙。
         ctx.fillStyle = '#c9a86a';
@@ -1454,6 +1942,66 @@
     }
 
     function drawDecor() {
+      if (currentMap === 'icelake') {
+        // 冰湖：冰锥与雪石。
+        for (const r of decor.rocks) {
+          const sx = r.x - camera.x;
+          const sy = r.y - camera.y;
+          if (sx < -60 || sy < -80 || sx > canvas.width + 60 || sy > canvas.height + 60) continue;
+          ctx.fillStyle = 'rgba(190, 220, 238, 0.9)';
+          ctx.beginPath();
+          ctx.moveTo(sx - 12 * r.s, sy);
+          ctx.lineTo(sx, sy - 34 * r.s);
+          ctx.lineTo(sx + 12 * r.s, sy);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.beginPath();
+          ctx.moveTo(sx - 5 * r.s, sy);
+          ctx.lineTo(sx, sy - 34 * r.s);
+          ctx.lineTo(sx + 2 * r.s, sy);
+          ctx.closePath();
+          ctx.fill();
+        }
+        return;
+      }
+      if (currentMap === 'sahali') {
+        // 斯哈里国：残破石柱与宫墙。
+        const cx = WORLD.w / 2;
+        // 宫殿残墙。
+        const wx = cx - camera.x;
+        const wy = 220 - camera.y;
+        if (wy > -260 && wy < canvas.height + 60) {
+          ctx.fillStyle = '#a8874f';
+          ctx.fillRect(wx - 320, wy - 20, 640, 60);
+          ctx.fillStyle = '#8a6a3c';
+          ctx.fillRect(wx - 320, wy + 40, 640, 12);
+          // 拱门缺口。
+          ctx.fillStyle = '#c2a26e';
+          ctx.fillRect(wx - 50, wy + 10, 100, 42);
+        }
+        // 石柱（部分断裂）。
+        const pillars = [
+          [cx - 400, 480, 1], [cx + 400, 480, 1],
+          [cx - 400, 860, 0.55], [cx + 400, 860, 0.7],
+          [cx - 200, 1250, 0.8], [cx + 200, 1250, 0.5]
+        ];
+        for (const [px, py, h] of pillars) {
+          const sx = px - camera.x;
+          const sy = py - camera.y;
+          if (sx < -70 || sy < -140 || sx > canvas.width + 70 || sy > canvas.height + 70) continue;
+          ctx.fillStyle = 'rgba(0,0,0,0.18)';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy + 4, 22, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#b0925a';
+          ctx.fillRect(sx - 14, sy - 110 * h, 28, 110 * h);
+          ctx.fillStyle = '#9a7a48';
+          ctx.fillRect(sx - 18, sy - 110 * h - 10, 36, 12);
+          ctx.fillRect(sx - 18, sy - 8, 36, 10);
+        }
+        return;
+      }
       if (currentMap === 'huangfeng') {
         // 黄风岭：褐岩与枯树。
         for (const r of decor.rocks) {
@@ -1981,7 +2529,8 @@
 
       ctx.restore();
 
-      // 头顶血条。
+      // 头顶血条（盟友不显示）。
+      if (e.noBar) return;
       const barWidth = u * 2.6;
       const bx = sx - barWidth / 2;
       const by = sy - u * 3.8;
@@ -2385,6 +2934,510 @@
 
       // 头顶血条。
       const barWidth = u * 2.6;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.6;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
+    // 小西天土地：拄杖的矮小老者，飞行时脚踏祥云。
+    function drawTudigong() {
+      if (!tudigong) return;
+      const sx = tudigong.x - camera.x;
+      const sy = tudigong.y - camera.y;
+      const u = 11;
+
+      ctx.save();
+      ctx.translate(sx, sy);
+
+      if (introPhase === 'fly') {
+        // 祥云。
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, u * 1.6, u * 0.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(-u, -u * 0.2, u * 0.9, u * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, u, u * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 木杖。
+      ctx.strokeStyle = '#6b4a2a';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(u * 0.8, -u * 0.2);
+      ctx.lineTo(u * 0.9, -u * 2.6);
+      ctx.stroke();
+
+      // 褐袍。
+      ctx.fillStyle = '#7a5a3a';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.6, -u * 2.1);
+      ctx.quadraticCurveTo(-u * 0.8, -u * 1, -u * 0.7, -u * 0.2);
+      ctx.lineTo(u * 0.7, -u * 0.2);
+      ctx.quadraticCurveTo(u * 0.8, -u * 1, u * 0.6, -u * 2.1);
+      ctx.closePath();
+      ctx.fill();
+
+      // 脑袋与白胡子。
+      ctx.fillStyle = '#e8c8a0';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.6, u * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f0f0f0';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.35, -u * 2.4);
+      ctx.quadraticCurveTo(0, -u * 1.6, u * 0.35, -u * 2.4);
+      ctx.quadraticCurveTo(0, -u * 2.1, -u * 0.35, -u * 2.4);
+      ctx.fill();
+      // 白眉与眯眼。
+      ctx.strokeStyle = '#f0f0f0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.28, -u * 2.72);
+      ctx.lineTo(-u * 0.1, -u * 2.68);
+      ctx.moveTo(u * 0.1, -u * 2.68);
+      ctx.lineTo(u * 0.28, -u * 2.72);
+      ctx.stroke();
+      ctx.fillStyle = '#1a1208';
+      ctx.beginPath();
+      ctx.arc(-u * 0.16, -u * 2.6, u * 0.05, 0, Math.PI * 2);
+      ctx.arc(u * 0.16, -u * 2.6, u * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 头顶标注。
+      ctx.fillStyle = '#e8d9a8';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('小西天土地', 0, -u * 3.4);
+      ctx.textAlign = 'left';
+
+      ctx.restore();
+    }
+
+    // 黄眉：黄袍胖和尚，大耳长眉，手持后天袋（剧情 NPC）。
+    function drawHuangmei() {
+      if (!huangmei) return;
+      const sx = huangmei.x - camera.x;
+      const sy = huangmei.y - camera.y;
+      if (sx < -100 || sy < -120 || sx > canvas.width + 100 || sy > canvas.height + 120) return;
+      const u = 15;
+      const bob = Math.sin(frameCount * 0.06) * 1.5;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.24)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.2, u * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 黄袍胖身。
+      const robe = ctx.createRadialGradient(-u * 0.2, -u * 1.6, u * 0.2, 0, -u * 1.1, u * 1.3);
+      robe.addColorStop(0, '#d4af37');
+      robe.addColorStop(1, '#8a6a1e');
+      ctx.fillStyle = robe;
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.1, u * 1.05, u * 1.05, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#6e4f10';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, -u * 1.1, u * 1.03, Math.PI * 0.2, Math.PI * 0.8);
+      ctx.stroke();
+
+      // 双臂，左手托后天袋。
+      ctx.fillStyle = '#b8922a';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.95, -u * 1.15, u * 0.24, u * 0.5, 0.4, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.95, -u * 1.15, u * 0.24, u * 0.5, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      // 后天袋：灰布口袋。
+      ctx.fillStyle = '#8a8578';
+      ctx.beginPath();
+      ctx.moveTo(-u * 1.35, -u * 1.35);
+      ctx.quadraticCurveTo(-u * 1.5, -u * 0.9, -u * 1.2, -u * 0.8);
+      ctx.quadraticCurveTo(-u * 0.9, -u * 0.9, -u * 1.0, -u * 1.35);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#5c574a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-u * 1.32, -u * 1.3);
+      ctx.lineTo(-u * 1.03, -u * 1.3);
+      ctx.stroke();
+
+      // 大脑袋与垂肩大耳。
+      ctx.fillStyle = '#e8c8a0';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.55, u * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.62, -u * 2.5, u * 0.16, u * 0.42, 0.15, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.62, -u * 2.5, u * 0.16, u * 0.42, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+      // 黄色长眉。
+      ctx.strokeStyle = '#e8c53a';
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.32, -u * 2.72);
+      ctx.quadraticCurveTo(-u * 0.5, -u * 2.5, -u * 0.42, -u * 2.2);
+      ctx.moveTo(u * 0.32, -u * 2.72);
+      ctx.quadraticCurveTo(u * 0.5, -u * 2.5, u * 0.42, -u * 2.2);
+      ctx.stroke();
+      // 眯眼与笑嘴。
+      ctx.strokeStyle = '#3a2018';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.24, -u * 2.58);
+      ctx.lineTo(-u * 0.08, -u * 2.58);
+      ctx.moveTo(u * 0.08, -u * 2.58);
+      ctx.lineTo(u * 0.24, -u * 2.58);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.4, u * 0.16, 0.3, Math.PI - 0.3);
+      ctx.stroke();
+
+      // 头顶标注。
+      ctx.fillStyle = '#e8d9a8';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('黄眉', 0, -u * 3.3);
+      ctx.textAlign = 'left';
+
+      ctx.restore();
+    }
+
+    // 亢金龙：银甲巨龙，蓝色鬃毛，金色鹿角，S 形龙身。
+    function drawKanglong(e, sx, sy) {
+      const u = e.radius * 1.15;
+      const bob = Math.sin(frameCount * 0.07) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.5, u * 2.2);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.26)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.4, u * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // S 形龙身：从尾到颈一串银白圆节。
+      for (let i = 7; i >= 1; i--) {
+        const wob = Math.sin(frameCount * 0.08 + i * 0.9) * u * 0.45 * (i / 7);
+        const bx = wob;
+        const by = -u * 0.2 - i * u * 0.42;
+        const br = u * (0.72 - i * 0.045);
+        const shade = 235 - i * 8;
+        ctx.fillStyle = `rgb(${shade - 20}, ${shade - 8}, ${shade})`;
+        ctx.beginPath();
+        ctx.arc(bx, by, br, 0, Math.PI * 2);
+        ctx.fill();
+        // 腹鳞线。
+        ctx.strokeStyle = 'rgba(140, 170, 200, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(bx, by, br * 0.6, Math.PI * 0.2, Math.PI * 0.8);
+        ctx.stroke();
+        // 背脊蓝鬃。
+        ctx.fillStyle = '#4a7ab5';
+        ctx.beginPath();
+        ctx.moveTo(bx - br * 0.25, by - br * 0.85);
+        ctx.lineTo(bx, by - br * 1.3);
+        ctx.lineTo(bx + br * 0.25, by - br * 0.85);
+        ctx.fill();
+      }
+
+      // 龙爪。
+      ctx.fillStyle = '#dfe8f0';
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(side * u * 0.85, -u * 1.15, u * 0.18, u * 0.3, side * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#8aa4b8';
+        for (let c = 0; c < 3; c++) {
+          ctx.beginPath();
+          ctx.moveTo(side * (u * 0.92 + c * u * 0.07), -u * 0.9);
+          ctx.lineTo(side * (u * 1.0 + c * u * 0.07), -u * 0.9);
+          ctx.lineTo(side * (u * 0.96 + c * u * 0.07), -u * 0.72);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#dfe8f0';
+      }
+
+      // 龙头。
+      const hy = -u * 3.6;
+      ctx.fillStyle = '#e8eef4';
+      ctx.beginPath();
+      ctx.ellipse(0, hy, u * 0.55, u * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 长吻。
+      ctx.fillStyle = '#dfe8f0';
+      ctx.beginPath();
+      ctx.ellipse(0, hy + u * 0.3, u * 0.34, u * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2a3a4a';
+      ctx.beginPath();
+      ctx.arc(-u * 0.12, hy + u * 0.26, u * 0.04, 0, Math.PI * 2);
+      ctx.arc(u * 0.12, hy + u * 0.26, u * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      // 金色鹿角。
+      ctx.strokeStyle = '#d4af37';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * u * 0.3, hy - u * 0.35);
+        ctx.quadraticCurveTo(side * u * 0.55, hy - u * 0.9, side * u * 0.35, hy - u * 1.3);
+        ctx.moveTo(side * u * 0.45, hy - u * 0.75);
+        ctx.lineTo(side * u * 0.7, hy - u * 1.0);
+        ctx.stroke();
+      }
+      // 蓝色鬃毛披散。
+      ctx.fillStyle = '#4a7ab5';
+      ctx.beginPath();
+      ctx.ellipse(0, hy - u * 0.25, u * 0.65, u * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 龙须。
+      ctx.strokeStyle = '#dfe8f0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.25, hy + u * 0.3);
+      ctx.quadraticCurveTo(-u * 0.8, hy + u * 0.5, -u * 0.9, hy + u * 0.9);
+      ctx.moveTo(u * 0.25, hy + u * 0.3);
+      ctx.quadraticCurveTo(u * 0.8, hy + u * 0.5, u * 0.9, hy + u * 0.9);
+      ctx.stroke();
+      // 金色龙眼。
+      ctx.fillStyle = '#ffd24a';
+      ctx.shadowColor = '#ffd24a';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.22, hy - u * 0.05, u * 0.11, u * 0.08, -0.3, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.22, hy - u * 0.05, u * 0.11, u * 0.08, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.22, hy - u * 0.05, u * 0.04, u * 0.07, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.22, hy - u * 0.05, u * 0.04, u * 0.07, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.6, u * 1.3, u * 2.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.8;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 4.9;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
+    // 黄袍员外：醉卧的猪 NPC（原点为脚底）。
+    function drawPigNpc() {
+      if (!pigNpc) return;
+      const sx = pigNpc.x - camera.x;
+      const sy = pigNpc.y - camera.y;
+      if (sx < -80 || sy < -100 || sx > canvas.width + 80 || sy > canvas.height + 80) return;
+      const u = 15;
+      const breathe = Math.sin(frameCount * 0.05) * 1.5;
+
+      ctx.save();
+      ctx.translate(sx, sy);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.2, u * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 黄袍（坐姿）。
+      ctx.fillStyle = '#c9a13a';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 0.8 + breathe * 0.3, u * 1.05, u * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#8a6a1e';
+      ctx.fillRect(-u * 1.0, -u * 1.0, u * 2, u * 0.18);
+
+      // 猪头：粉棕大耳、拱鼻。
+      ctx.fillStyle = '#c98d7a';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.9 + breathe * 0.3, u * 0.62, u * 0.52, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 耷拉的大耳。
+      ctx.fillStyle = '#b87a68';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.52, -u * 2.25, u * 0.22, u * 0.34, -0.5, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.52, -u * 2.25, u * 0.22, u * 0.34, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      // 拱鼻与鼻孔。
+      ctx.fillStyle = '#d89d8a';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.72, u * 0.26, u * 0.18, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5c2a20';
+      ctx.beginPath();
+      ctx.arc(-u * 0.08, -u * 1.72, u * 0.045, 0, Math.PI * 2);
+      ctx.arc(u * 0.08, -u * 1.72, u * 0.045, 0, Math.PI * 2);
+      ctx.fill();
+      // 醉眼（眯成线）。
+      ctx.strokeStyle = '#3a2018';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.3, -u * 2.0);
+      ctx.lineTo(-u * 0.12, -u * 2.0);
+      ctx.moveTo(u * 0.12, -u * 2.0);
+      ctx.lineTo(u * 0.3, -u * 2.0);
+      ctx.stroke();
+      // 酒葫芦。
+      ctx.fillStyle = '#7a5a2a';
+      ctx.beginPath();
+      ctx.ellipse(u * 1.1, -u * 0.5, u * 0.3, u * 0.4, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(u * 1.02, -u * 1.0, u * 0.16, u * 0.2);
+
+      // 头顶提示。
+      ctx.fillStyle = '#e8d9a8';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('黄袍员外', 0, -u * 2.9);
+      ctx.textAlign = 'left';
+
+      ctx.restore();
+    }
+
+    // 蝜蝂：斯哈里国的巨甲虫（原点为腹部中心下方）。
+    function drawFuban(e, sx, sy) {
+      const u = e.radius * 1.2;
+      const bob = Math.sin(frameCount * 0.06) * 1.5;
+
+      ctx.save();
+      ctx.translate(sx, sy - u * 0.6 + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, 0, u * 1.8);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, u * 0.75, u * 1.5, u * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 六条腿。
+      ctx.strokeStyle = '#2a1a10';
+      ctx.lineWidth = u * 0.1;
+      ctx.lineCap = 'round';
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 3; i++) {
+          const lx = side * u * (0.5 + i * 0.35);
+          const swing = Math.sin(frameCount * 0.2 + i * 2 + (side > 0 ? 1 : 0)) * u * 0.12;
+          ctx.beginPath();
+          ctx.moveTo(side * u * 0.7, u * 0.1);
+          ctx.quadraticCurveTo(lx * 1.2, u * 0.4, lx * 1.35 + swing, u * 0.85);
+          ctx.stroke();
+        }
+      }
+
+      // 巨壳（鞘翅）：深色带中缝与光泽。
+      const shell = ctx.createRadialGradient(-u * 0.4, -u * 0.6, u * 0.2, 0, -u * 0.1, u * 1.5);
+      shell.addColorStop(0, '#4a3826');
+      shell.addColorStop(1, '#1a1008');
+      ctx.fillStyle = shell;
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 0.1, u * 1.25, u * 0.95, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#0d0805';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, -u * 1.0);
+      ctx.lineTo(0, u * 0.75);
+      ctx.stroke();
+      // 壳上金斑。
+      ctx.fillStyle = 'rgba(212, 175, 55, 0.5)';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.5, -u * 0.4, u * 0.18, u * 0.12, 0.4, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.5, -u * 0.4, u * 0.18, u * 0.12, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 头与巨角。
+      ctx.fillStyle = '#2a1a10';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.05, u * 0.45, u * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#1a1008';
+      ctx.lineWidth = u * 0.14;
+      ctx.beginPath();
+      ctx.moveTo(0, -u * 1.25);
+      ctx.quadraticCurveTo(0, -u * 2.1, u * 0.15, -u * 2.5);
+      ctx.stroke();
+      // 分叉角尖。
+      ctx.lineWidth = u * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(u * 0.15, -u * 2.5);
+      ctx.lineTo(u * 0.35, -u * 2.62);
+      ctx.moveTo(u * 0.15, -u * 2.5);
+      ctx.lineTo(-u * 0.05, -u * 2.68);
+      ctx.stroke();
+
+      // 赤红复眼。
+      ctx.fillStyle = '#d42a2a';
+      ctx.shadowColor = '#ff4444';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.28, -u * 1.08, u * 0.12, u * 0.1, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.28, -u * 1.08, u * 0.12, u * 0.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // 大颚。
+      ctx.strokeStyle = '#1a1008';
+      ctx.lineWidth = u * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.2, -u * 0.85);
+      ctx.quadraticCurveTo(-u * 0.45, -u * 0.7, -u * 0.4, -u * 0.5);
+      ctx.moveTo(u * 0.2, -u * 0.85);
+      ctx.quadraticCurveTo(u * 0.45, -u * 0.7, u * 0.4, -u * 0.5);
+      ctx.stroke();
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 0.3, u * 1.4, u * 1.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.restore();
+
+      // 头顶血条。
+      const barWidth = u * 2.8;
       const bx = sx - barWidth / 2;
       const by = sy - u * 3.6;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -2914,6 +3967,8 @@
       if (e.isBoss) {
         if (e.type === 'jinchi') drawJinchi(e, sx, sy);
         else if (e.type === 'huangfeng') drawHuangfengBoss(e, sx, sy);
+        else if (e.type === 'fuban') drawFuban(e, sx, sy);
+        else if (e.type === 'kanglong') drawKanglong(e, sx, sy);
         else if (e.type === 'shaguo') drawShaguo(e, sx, sy);
         else if (e.type === 'shixian') drawShixian(e, sx, sy);
         else if (e.type === 'huxian') drawHuxian(e, sx, sy);
@@ -2946,6 +4001,47 @@
       const sx = player.x - camera.x;
       const sy = player.y - camera.y;
       const r = player.r;
+
+      // 第三章剧情：化蝠形态。
+      if (currentMap === 'intro' && (introPhase === 'transform' || introPhase === 'fly')) {
+        const flap = Math.sin(frameCount * 0.5) * 0.7;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.fillStyle = '#2a2a32';
+        // 双翼扑动。
+        ctx.beginPath();
+        ctx.moveTo(-4, -12);
+        ctx.quadraticCurveTo(-22, -20 - flap * 12, -34, -8 - flap * 16);
+        ctx.quadraticCurveTo(-18, -4, -4, -6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(4, -12);
+        ctx.quadraticCurveTo(22, -20 - flap * 12, 34, -8 - flap * 16);
+        ctx.quadraticCurveTo(18, -4, 4, -6);
+        ctx.closePath();
+        ctx.fill();
+        // 身体与耳朵。
+        ctx.beginPath();
+        ctx.ellipse(0, -10, 7, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-5, -17);
+        ctx.lineTo(-7, -23);
+        ctx.lineTo(-2, -18);
+        ctx.moveTo(5, -17);
+        ctx.lineTo(7, -23);
+        ctx.lineTo(2, -18);
+        ctx.fill();
+        // 金色小眼（还是那只猴）。
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.arc(-2.5, -11, 1.6, 0, Math.PI * 2);
+        ctx.arc(2.5, -11, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        return;
+      }
 
       ctx.save();
       ctx.translate(sx, sy);
@@ -3420,10 +4516,21 @@
       if (currentMap === 'forest') {
         for (const b of bells) drawBell(b);
       }
+      if (currentMap === 'huangfeng') drawPigNpc();
+      if (currentMap === 'icelake') drawHuangmei();
       for (const p of peaches) drawPeach(p);
 
       // 按 y 排序绘制，制造前后遮挡关系。
       const drawList = enemies.map(e => ({ y: e.y, draw: () => drawEnemy(e) }));
+      if (ally) {
+        drawList.push({
+          y: ally.y,
+          draw: () => drawHuangfengBoss(ally, ally.x - camera.x, ally.y - camera.y)
+        });
+      }
+      if (tudigong && introPhase !== 'walk') {
+        drawList.push({ y: tudigong.y, draw: drawTudigong });
+      }
       drawList.push({ y: player.y, draw: drawPlayer });
       drawList.sort((a, b) => a.y - b.y);
       for (const item of drawList) item.draw();
@@ -3448,6 +4555,10 @@
       updateEnemies();
       updatePeaches();
       updateBells();
+      updateAlly();
+      updatePigNpc();
+      updateIntro();
+      updateIcelake();
       updateProjectiles();
       updateParticles();
       updateSlashes();
@@ -3473,6 +4584,14 @@
         respawnAtCheckpoint();
         return;
       }
+      if (checkpoint && checkpoint.map === 'icelake' && currentMap === 'icelake') {
+        overlay.style.display = 'none';
+        enterIcelake();
+        banner = { text: '于冰湖存档点复活', timer: 140 };
+        gameRunning = true;
+        gameLoop();
+        return;
+      }
       initGame();
       gameLoop();
     }
@@ -3492,6 +4611,7 @@
       if (e.key === '2') castSweep();
       if (e.key === '3') castFire();
       if (e.key === '4') castTransform();
+      if (e.key === '5') castPearl();
       if (e.key === 'q' || e.key === 'Q') {
         stanceIdx = (stanceIdx + 1) % STANCES.length;
         stanceNameEl.textContent = STANCES[stanceIdx].name;
