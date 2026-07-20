@@ -60,56 +60,37 @@
       pointer-events: none;
     }
 
-    #player-resources {
-      position: fixed;
-      left: 18px;
-      bottom: 82px;
-      z-index: 4;
-      width: min(310px, 34vw);
-      padding: 10px 12px;
-      border: 1px solid rgba(212, 175, 55, 0.6);
-      border-radius: 10px;
-      background: rgba(10, 8, 6, 0.76);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-      pointer-events: none;
-    }
-
-    .resource-row {
-      display: grid;
-      grid-template-columns: 38px 1fr 68px;
-      align-items: center;
-      gap: 7px;
-      margin: 5px 0;
-      color: #f5ecd2;
-      font-size: 12px;
-      font-weight: bold;
-      text-shadow: 0 1px 2px #000;
-    }
-
-    .resource-track {
-      height: 14px;
+    #player-hp {
+      position: absolute;
+      top: 126px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 24px;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.35);
+      border: 2px solid #d4af37;
       border-radius: 7px;
-      background: rgba(0, 0, 0, 0.55);
+      background: #2a1a10;
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+      text-align: center;
+      z-index: 2;
     }
 
-    .resource-fill {
-      display: block;
+    #player-hp-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
       width: 100%;
-      height: 100%;
-      transition: width 0.16s ease;
+      background: linear-gradient(90deg, #c0392b, #d4af37);
+      transition: width 0.2s ease;
     }
 
-    #player-hp-fill { background: linear-gradient(90deg, #a92220, #e35b3d); }
-    #player-mana-fill { background: linear-gradient(90deg, #1954a6, #56a8ff); }
-    #player-stamina-fill { background: linear-gradient(90deg, #8b791a, #ead84e); }
-    .resource-value { text-align: right; font-variant-numeric: tabular-nums; }
-
-    body.touch #player-resources {
-      left: 24px;
-      bottom: 184px;
-      width: 250px;
+    #player-hp-text {
+      position: relative;
+      z-index: 1;
+      line-height: 20px;
+      text-shadow: 0 1px 2px #000;
     }
 
     #boss-hp {
@@ -374,6 +355,7 @@
       h1 { font-size: 16px; top: 4px; }
       #info { display: none; }
       #score-board { top: 30px; font-size: 14px; }
+      #player-hp { top: 52px; width: 220px; height: 18px; }
       #boss-hp { top: 76px; font-size: 13px; }
       #skill-bar { display: none; }
       #progress-hud { top: 6px; right: 8px; font-size: 10px; padding: 5px 8px; }
@@ -383,9 +365,6 @@
       .talent-card { min-height: 130px; padding: 10px; }
       .talent-card b { font-size: 14px; }
       .talent-card span { font-size: 11px; }
-      #player-resources { width: 220px; padding: 6px 8px; }
-      .resource-row { grid-template-columns: 32px 1fr 56px; gap: 5px; margin: 3px 0; font-size: 10px; }
-      body.touch #player-resources { bottom: 146px; left: 18px; width: 210px; }
     }
   </style>
 </head>
@@ -393,21 +372,13 @@
   <h1>哈悟空</h1>
   <div id="info">
     WASD 移动探索，空格长按蓄力、松开挥棒（越久伤害越高），J / 点击快速挥棒，Shift 闪避<br/>
-    Q 切换已解锁棍式 · 1—4 法术与变化 · 5—6 法宝 · T 土地庙悟道<br/>
-    法术与变化消耗法力，攻击与闪避消耗气力
+    Q 切换已解锁棍式 · 1—4 法术与变化 · 5—6 法宝 · T 土地庙悟道
   </div>
   <div id="score-board">得分: 0 | 击杀: 0</div>
   <div id="progress-hud">灵蕴 0<br/>修行点 0</div>
-  <div id="player-resources" aria-label="角色资源">
-    <div id="player-hp" class="resource-row">
-      <span>血量</span><span class="resource-track"><i id="player-hp-fill" class="resource-fill"></i></span><span id="player-hp-text" class="resource-value">300/300</span>
-    </div>
-    <div id="player-mana" class="resource-row">
-      <span>法力</span><span class="resource-track"><i id="player-mana-fill" class="resource-fill"></i></span><span id="player-mana-text" class="resource-value">100/100</span>
-    </div>
-    <div id="player-stamina" class="resource-row">
-      <span>气力</span><span class="resource-track"><i id="player-stamina-fill" class="resource-fill"></i></span><span id="player-stamina-text" class="resource-value">100/100</span>
-    </div>
+  <div id="player-hp">
+    <div id="player-hp-fill"></div>
+    <span id="player-hp-text">生命值: 300/300</span>
   </div>
   <div id="boss-hp">黑风大王 HP: 800/800</div>
   <div id="objective">第一章 · 寻找三口山钟，探索黑风山</div>
@@ -482,10 +453,6 @@
     const scoreEl = document.getElementById('score-board');
     const playerHpTextEl = document.getElementById('player-hp-text');
     const playerHpFillEl = document.getElementById('player-hp-fill');
-    const playerManaTextEl = document.getElementById('player-mana-text');
-    const playerManaFillEl = document.getElementById('player-mana-fill');
-    const playerStaminaTextEl = document.getElementById('player-stamina-text');
-    const playerStaminaFillEl = document.getElementById('player-stamina-fill');
     const bossHpEl = document.getElementById('boss-hp');
     const overlay = document.getElementById('overlay');
     const overlayTitle = document.getElementById('overlay-title');
@@ -638,10 +605,6 @@
       moveDy: 0,
       hp: 300,
       maxHp: 300,
-      mana: 100,
-      maxMana: 100,
-      stamina: 100,
-      maxStamina: 100,
       hurtCooldown: 0,
       maxHurtCooldown: 45,
       empowered: false,
@@ -683,21 +646,10 @@
 
     function applyTalentStats(heal = true) {
       const oldMax = player.maxHp;
-      const oldMaxMana = player.maxMana;
-      const oldMaxStamina = player.maxStamina;
       player.maxHp = 300 + progress.talents.body * 35;
-      player.maxMana = 100 + progress.talents.spell * 15;
-      player.maxStamina = 100 + progress.talents.body * 10;
       dodge.maxCooldown = Math.max(27, 42 - progress.talents.body * 5);
-      if (heal) {
-        player.hp = player.maxHp;
-        player.mana = player.maxMana;
-        player.stamina = player.maxStamina;
-      } else {
-        player.hp = Math.min(player.maxHp, player.hp + Math.max(0, player.maxHp - oldMax));
-        player.mana = Math.min(player.maxMana, player.mana + Math.max(0, player.maxMana - oldMaxMana));
-        player.stamina = Math.min(player.maxStamina, player.stamina + Math.max(0, player.maxStamina - oldMaxStamina));
-      }
+      if (heal) player.hp = player.maxHp;
+      else player.hp = Math.min(player.maxHp, player.hp + Math.max(0, player.maxHp - oldMax));
       updateUI();
     }
 
@@ -1052,7 +1004,7 @@
       checkpoint = { map: 'futu' };
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 260;
-      refillResources();
+      player.hp = player.maxHp;
       for (let i = 0; i < 3; i++) {
         peaches.push({
           x: randomRange(300, WORLD.w - 300),
@@ -1076,7 +1028,7 @@
       tudigong = null;
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 200;
-      refillResources();
+      player.hp = player.maxHp;
       banner = { text: '第三章 · 小西天', timer: 170 };
       updateUI();
     }
@@ -1125,7 +1077,7 @@
       checkpoint = { map: 'icelake' };
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 260;
-      refillResources();
+      player.hp = player.maxHp;
       huangmei = { x: WORLD.w / 2, y: 360 };
       icelakePhase = 'arrive';
       icelakeTimer = 150;
@@ -1291,7 +1243,7 @@
       spawnChapterBoss();
       // 黄袍员外（猪 NPC）守在地图最右侧，完成支线后消失。
       pigNpc = player.sahaliDone ? null : { x: WORLD.w - 180, y: WORLD.h / 2 + 100 };
-      refillResources();
+      player.hp = player.maxHp;
       player.hurtCooldown = 0;
       bossActive = false;
       updateUI();
@@ -1497,39 +1449,12 @@
       damageTexts.push({ x, y, damage, color, life: 1, vy: -1.6 });
     }
 
-    function updateResourceUI() {
-      const hp = Math.max(0, Math.ceil(player.hp));
-      const mana = Math.max(0, Math.floor(player.mana));
-      const stamina = Math.max(0, Math.floor(player.stamina));
-      playerHpTextEl.textContent = `${hp}/${player.maxHp}`;
-      playerManaTextEl.textContent = `${mana}/${player.maxMana}`;
-      playerStaminaTextEl.textContent = `${stamina}/${player.maxStamina}`;
-      playerHpFillEl.style.width = `${clamp(player.hp / player.maxHp * 100, 0, 100)}%`;
-      playerManaFillEl.style.width = `${clamp(player.mana / player.maxMana * 100, 0, 100)}%`;
-      playerStaminaFillEl.style.width = `${clamp(player.stamina / player.maxStamina * 100, 0, 100)}%`;
-    }
-
-    function spendResource(type, amount) {
-      if (player[type] < amount) {
-        banner = { text: type === 'mana' ? '法力不足' : '气力不足', timer: 55 };
-        return false;
-      }
-      player[type] -= amount;
-      updateResourceUI();
-      return true;
-    }
-
-    function refillResources() {
-      player.hp = player.maxHp;
-      player.mana = player.maxMana;
-      player.stamina = player.maxStamina;
-      updateResourceUI();
-    }
-
     function updateUI() {
       const bellInfo = currentMap === 'forest' ? ` | 钟: ${bellsRung}/3` : '';
       scoreEl.textContent = `得分: ${score} | 击杀: ${kills}${bellInfo}`;
-      updateResourceUI();
+      const currentHp = Math.max(0, player.hp);
+      playerHpTextEl.textContent = `生命值: ${currentHp}/${player.maxHp}`;
+      playerHpFillEl.style.width = `${(currentHp / player.maxHp) * 100}%`;
       if (bossActive) {
         const boss = enemies.find(e => e.isBoss);
         if (boss) {
@@ -1637,8 +1562,6 @@
 
     function startSwing(power = 1) {
       if (staff.swinging || staff.cooldown > 0 || !gameRunning || modalOpen) return;
-      const staminaCost = power > 1.05 ? Math.round(10 + power * 3) : 7;
-      if (!spendResource('stamina', staminaCost)) return;
       const st = STANCES[stanceIdx];
       staff.swinging = true;
       staff.timer = staff.duration;
@@ -1855,12 +1778,14 @@
     function castFreeze() {
       const s = skills.freeze;
       if (!isUnlocked('unlockedSkills','freeze') || s.cd > 0 || !gameRunning || modalOpen) return;
-      const targets = enemies.filter(e => Math.hypot(e.x - player.x, e.y - player.y) <= 420);
-      if (!targets.length || !spendResource('mana', 25)) return;
-      for (const e of targets) {
+      let hit = false;
+      for (const e of enemies) {
+        if (Math.hypot(e.x - player.x, e.y - player.y) > 420) continue;
         e.frozen = FREEZE_DURATION;
         e.freezeBonusUsed = false;
+        hit = true;
       }
+      if (!hit) return;
       s.cd = skillCooldown(s);
       skillFx.push({ type: 'freezewave', life: 1 });
     }
@@ -1869,7 +1794,6 @@
     function castSweep() {
       const s = skills.sweep;
       if (!isUnlocked('unlockedSkills','sweep') || s.cd > 0 || !gameRunning || modalOpen) return;
-      if (!spendResource('mana', 30)) return;
       s.cd = skillCooldown(s);
       let hit = false;
       for (const e of enemies) {
@@ -1903,7 +1827,6 @@
         }
       }
       if (!target) return;
-      if (!spendResource('mana', 40)) return;
       s.cd = skillCooldown(s);
       skillFx.push({ type: 'beam', x1: player.x, y1: player.y, x2: target.x, y2: target.y - target.radius, life: 1 });
       applyDamage(target, 120);
@@ -1913,7 +1836,6 @@
     function castTransform() {
       const s = skills.transform;
       if (!isUnlocked('unlockedSkills','transform') || s.cd > 0 || transform.active || !gameRunning || modalOpen) return;
-      if (!spendResource('mana', 50)) return;
       transform.active = true;
       transform.timer = transform.duration;
       createParticles(player.x, player.y, '#ff7a2a', 24);
@@ -1997,7 +1919,6 @@
 
     function startDodge(dx, dy) {
       if (dodge.active || dodge.cooldown > 0 || !gameRunning || modalOpen) return;
-      if (!spendResource('stamina', 24)) return;
       dodge.active = true;
       dodge.timer = dodge.duration;
       dodge.dx = dx;
@@ -2006,11 +1927,6 @@
     }
 
     function updatePlayer() {
-      player.mana = Math.min(player.maxMana, player.mana + .055);
-      const staminaRegen = (dodge.active || staff.swinging) ? .14 : charge.charging ? .2 : .46;
-      player.stamina = Math.min(player.maxStamina, player.stamina + staminaRegen);
-      if (frameCount % 2 === 0) updateResourceUI();
-
       // 蓄力进度与吸附光点。
       if (charge.charging) {
         charge.level = Math.min(1, charge.level + 1 / charge.max);

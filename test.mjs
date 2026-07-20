@@ -96,16 +96,6 @@ if (run("progress.unlockedStances.join(',')") !== 'chop') throw new Error('新�
 if (run("progress.unlockedSkills.join(',')") !== 'freeze') throw new Error('新存档不应开局解锁全部法术');
 
 run('startChapter(1)');
-if (run('player.mana !== player.maxMana || player.stamina !== player.maxStamina')) {
-  throw new Error('开局没有补满法力与气力');
-}
-run('player.stamina = player.maxStamina; staff.swinging = false; staff.cooldown = 0; startSwing(1);');
-if (run('player.stamina') !== run('player.maxStamina - 7')) throw new Error('普通攻击没有正确消耗气力');
-run("player.mana = player.maxMana; skills.freeze.cd = 0; enemies = [{ x:player.x + 10, y:player.y, hp:100, radius:20, frozen:0 }]; castFreeze();");
-if (run('player.mana') !== run('player.maxMana - 25')) throw new Error('法术没有正确消耗法力');
-if (!elements.get('player-hp-fill').style.width || !elements.get('player-mana-fill').style.width || !elements.get('player-stamina-fill').style.width) {
-  throw new Error('左下角三资源条没有同步状态');
-}
 run('ringBell(bells[0]); ringBell(bells[1]); ringBell(bells[2]);');
 if (!run("progress.unlockedSkills.includes('sweep')")) throw new Error('三钟探索未解锁横扫六合');
 
