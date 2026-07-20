@@ -1,0 +1,9 @@
+{
+  "name": "wukong-game",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node test.mjs"
+  }
+}

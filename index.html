@@ -161,6 +161,47 @@
       box-shadow: 0 0 10px rgba(255, 122, 42, 0.5);
     }
 
+    .skill.locked { opacity: 0.28; filter: grayscale(1); }
+
+    #progress-hud {
+      position: fixed; top: 18px; right: 20px; z-index: 3;
+      padding: 9px 13px; border: 1px solid rgba(212, 175, 55, 0.65);
+      border-radius: 8px; background: rgba(10, 8, 6, 0.72); color: #ead58b;
+      font-size: 13px; line-height: 1.55; text-align: right; pointer-events: none;
+    }
+
+    #objective {
+      position: fixed; top: 184px; left: 50%; z-index: 3;
+      max-width: min(720px, 90vw); transform: translateX(-50%);
+      padding: 7px 14px; border-radius: 20px; background: rgba(24, 16, 10, 0.72);
+      color: #f0dfaa; font-size: 13px; text-align: center; pointer-events: none;
+    }
+
+    .modal {
+      position: fixed; inset: 0; z-index: 40; display: none; place-items: center;
+      padding: 24px; background: rgba(5, 4, 3, 0.84); backdrop-filter: blur(5px);
+    }
+    .modal.visible { display: grid; }
+    .modal-card {
+      width: min(800px, 94vw); max-height: 90vh; overflow: auto; padding: 30px;
+      border: 1px solid #d4af37; border-radius: 14px;
+      background: linear-gradient(145deg, rgba(35, 25, 17, .98), rgba(12, 10, 8, .98));
+      box-shadow: 0 24px 80px rgba(0,0,0,.6); text-align: center;
+    }
+    .modal-card h2 { margin-bottom: 10px; color: #d4af37; letter-spacing: 4px; }
+    .modal-card > p { margin: 8px 0 20px; color: #c9bc96; line-height: 1.65; }
+    .menu-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .menu-actions button[disabled] { opacity: .35; cursor: not-allowed; }
+    .talent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0; }
+    .talent-card {
+      min-height: 176px; padding: 18px 14px; border: 1px solid #786330;
+      background: rgba(69,49,29,.65); text-align: left;
+    }
+    .talent-card b, .talent-card span { display: block; }
+    .talent-card b { margin-bottom: 8px; color: #ffd86b; font-size: 18px; }
+    .talent-card span { color: #d7ccb0; font-size: 13px; line-height: 1.55; }
+    .talent-card small { display: block; margin-top: 12px; color: #ad9c70; }
+
     canvas {
       position: fixed;
       inset: 0;
@@ -317,6 +358,13 @@
       #player-hp { top: 52px; width: 220px; height: 18px; }
       #boss-hp { top: 76px; font-size: 13px; }
       #skill-bar { display: none; }
+      #progress-hud { top: 6px; right: 8px; font-size: 10px; padding: 5px 8px; }
+      #objective { top: 98px; font-size: 11px; }
+      .modal-card { padding: 18px; }
+      .talent-grid { grid-template-columns: repeat(3, 1fr); gap: 7px; }
+      .talent-card { min-height: 130px; padding: 10px; }
+      .talent-card b { font-size: 14px; }
+      .talent-card span { font-size: 11px; }
     }
   </style>
 </head>
@@ -324,14 +372,16 @@
   <h1>哈悟空</h1>
   <div id="info">
     WASD 移动探索，空格长按蓄力、松开挥棒（越久伤害越高），J / 点击快速挥棒，Shift 闪避<br/>
-    Q 切换棍式（劈 / 立 / 戳）· 技能：1 定身术 · 2 横扫六合 · 3 火眼金睛 · 4 广智变身 · 找到并击败黑风大王！
+    Q 切换已解锁棍式 · 1—4 法术与变化 · 5—6 法宝 · T 土地庙悟道
   </div>
   <div id="score-board">得分: 0 | 击杀: 0</div>
+  <div id="progress-hud">灵蕴 0<br/>修行点 0</div>
   <div id="player-hp">
     <div id="player-hp-fill"></div>
     <span id="player-hp-text">生命值: 300/300</span>
   </div>
   <div id="boss-hp">黑风大王 HP: 800/800</div>
+  <div id="objective">第一章 · 寻找三口山钟，探索黑风山</div>
   <div id="stage">
     <canvas id="game" width="800" height="600"></canvas>
     <div id="skill-bar">
@@ -340,9 +390,10 @@
       <div class="skill" id="skill-sweep"><span class="key">2</span>横扫六合<span class="cd"></span></div>
       <div class="skill" id="skill-fire"><span class="key">3</span>火眼金睛<span class="cd"></span></div>
       <div class="skill" id="skill-transform"><span class="key">4</span>广智变身<span class="cd"></span></div>
-      <div class="skill" id="skill-pearl" style="display:none"><span class="key">5</span>定风珠<span class="cd"></span></div>
+      <div class="skill" id="skill-pearl"><span class="key">5</span>定风珠<span class="cd"></span></div>
       <div class="skill" id="slot-sober" style="display:none"><span class="key">石</span>醒酒石</div>
-      <div class="skill" id="skill-mantle" style="display:none"><span class="key">宝</span>避火罩</div>
+      <div class="skill" id="skill-mantle"><span class="key">6</span>避火罩<span class="cd"></span></div>
+      <div class="skill"><span class="key">T</span>土地庙</div>
     </div>
   </div>
 
@@ -359,6 +410,8 @@
       <button class="tbtn" data-act="fire">火眼</button>
       <button class="tbtn" data-act="transform">变身</button>
       <button class="tbtn" data-act="pearl">定风</button>
+      <button class="tbtn" data-act="mantle">避火</button>
+      <button class="tbtn" data-act="talent">悟道</button>
       <button class="tbtn" data-act="dodge">闪避</button>
       <button class="tbtn" id="btn-attack">攻击</button>
     </div>
@@ -368,7 +421,31 @@
     <h2 id="overlay-title">游戏结束</h2>
     <p id="overlay-msg">最终得分: 0</p>
     <button onclick="restartGame()">重新开始</button>
+    <button onclick="returnToMenu()">章节选择</button>
   </div>
+
+  <section id="start-menu" class="modal visible">
+    <div class="modal-card">
+      <h2>哈悟空</h2>
+      <p>从黑风山一路修行至小西天。击败强敌获得修行点，在土地庙形成自己的棍法、法术与身法流派。</p>
+      <div class="menu-actions">
+        <button onclick="startChapter(1)">第一章 · 黑风山</button>
+        <button id="chapter2-button" onclick="startChapter(2)">第二章 · 黄风岭</button>
+        <button id="chapter3-button" onclick="startChapter(3)">第三章 · 小西天</button>
+        <button onclick="openTalentPanel(true)">土地庙悟道</button>
+      </div>
+      <p id="save-summary"></p>
+    </div>
+  </section>
+
+  <section id="talent-panel" class="modal">
+    <div class="modal-card">
+      <h2>土地庙 · 悟道</h2>
+      <p id="talent-points"></p>
+      <div id="talent-grid" class="talent-grid"></div>
+      <div class="menu-actions"><button onclick="closeTalentPanel()">返回旅途</button></div>
+    </div>
+  </section>
 
   <script>
     const canvas = document.getElementById('game');
@@ -380,6 +457,132 @@
     const overlay = document.getElementById('overlay');
     const overlayTitle = document.getElementById('overlay-title');
     const overlayMsg = document.getElementById('overlay-msg');
+    const progressHudEl = document.getElementById('progress-hud');
+    const objectiveEl = document.getElementById('objective');
+    const startMenuEl = document.getElementById('start-menu');
+    const talentPanelEl = document.getElementById('talent-panel');
+    const talentGridEl = document.getElementById('talent-grid');
+    const talentPointsEl = document.getElementById('talent-points');
+
+    const SAVE_KEY = 'haWukongProgressV3';
+    const DEFAULT_PROGRESS = {
+      spirit: 0, cultivation: 0, chapterUnlocked: 1, chapter2Checkpoint: 0,
+      unlockedStances: ['chop'], unlockedSkills: ['freeze'], unlockedRelics: [],
+      talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false
+    };
+
+    function loadProgress() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}');
+        const list = value => Array.isArray(value) ? value : [];
+        return {
+          ...DEFAULT_PROGRESS, ...raw,
+          talents: { ...DEFAULT_PROGRESS.talents, ...(raw.talents || {}) },
+          unlockedStances: [...new Set(['chop', ...list(raw.unlockedStances)])],
+          unlockedSkills: [...new Set(['freeze', ...list(raw.unlockedSkills)])],
+          unlockedRelics: [...new Set(list(raw.unlockedRelics))],
+          bossRewards: [...new Set(list(raw.bossRewards))]
+        };
+      } catch {
+        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze'], unlockedRelics: [], bossRewards: [] };
+      }
+    }
+
+    let progress = loadProgress();
+    let modalOpen = true;
+    let talentReturnToStart = false;
+
+    function persistProgress() {
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch {}
+      updateProgressUI();
+    }
+
+    function setObjective(text) { objectiveEl.textContent = text; }
+
+    function updateProgressUI() {
+      progressHudEl.innerHTML = `灵蕴 ${progress.spirit}<br/>修行点 ${progress.cultivation}`;
+      document.getElementById('chapter2-button').disabled = progress.chapterUnlocked < 2;
+      document.getElementById('chapter3-button').disabled = progress.chapterUnlocked < 3;
+      document.getElementById('save-summary').textContent = progress.completedChapter3
+        ? '第三章已通关 · 可继续完善流派与重玩章节'
+        : `最高章节：第${progress.chapterUnlocked}章 · 已投入修行点：${Object.values(progress.talents).reduce((a,b) => a+b, 0)}`;
+    }
+
+    const TALENTS = {
+      staff: { name: '棍法 · 破势', descriptions: ['蓄力与棍式伤害提升12%', '三段连击增幅提高', '满蓄力震慑普通敌人'] },
+      spell: { name: '法术 · 凝神', descriptions: ['法术冷却缩短10%', '首次击中定身目标增伤35%', '击杀返还法术5%冷却'] },
+      body: { name: '身法 · 流云', descriptions: ['生命上限增加35并缩短闪避冷却', '完美闪避回复15生命', '完美闪避后的下一击提升至2.5倍'] }
+    };
+    const talentCost = rank => [120, 220, 360][rank] ?? Infinity;
+
+    function openTalentPanel(fromStart = false) {
+      talentReturnToStart = fromStart;
+      modalOpen = true;
+      startMenuEl.classList.remove('visible');
+      talentPanelEl.classList.add('visible');
+      renderTalentPanel();
+    }
+
+    function closeTalentPanel() {
+      talentPanelEl.classList.remove('visible');
+      if (talentReturnToStart) startMenuEl.classList.add('visible');
+      else modalOpen = false;
+      talentReturnToStart = false;
+    }
+
+    function renderTalentPanel() {
+      talentPointsEl.textContent = `灵蕴 ${progress.spirit} · 修行点 ${progress.cultivation}。每次参悟消耗1修行点。`;
+      talentGridEl.innerHTML = '';
+      for (const [key, talent] of Object.entries(TALENTS)) {
+        const rank = progress.talents[key];
+        const cost = talentCost(rank);
+        const card = document.createElement('button');
+        card.className = 'talent-card';
+        card.disabled = rank >= 3 || progress.cultivation < 1 || progress.spirit < cost;
+        card.innerHTML = `<b>${talent.name} ${rank}/3</b><span>${talent.descriptions[rank] || '已参悟至圆满'}</span><small>${rank >= 3 ? '已圆满' : `消耗：${cost}灵蕴 + 1修行点`}</small>`;
+        card.addEventListener('click', () => spendTalent(key));
+        talentGridEl.appendChild(card);
+      }
+    }
+
+    function spendTalent(key) {
+      const rank = progress.talents[key], cost = talentCost(rank);
+      if (rank >= 3 || progress.cultivation < 1 || progress.spirit < cost) return;
+      progress.spirit -= cost; progress.cultivation--; progress.talents[key]++;
+      applyTalentStats(false); persistProgress(); renderTalentPanel();
+    }
+
+    function isUnlocked(group, key) { return progress[group].includes(key); }
+
+    function unlock(group, key, text) {
+      if (isUnlocked(group, key)) return false;
+      progress[group].push(key); persistProgress(); updateUnlockUI();
+      banner = { text, timer: 210 }; return true;
+    }
+
+    function grantBossReward(id, spirit = 120) {
+      if (progress.bossRewards.includes(id)) return false;
+      progress.bossRewards.push(id); progress.spirit += spirit; progress.cultivation++;
+      persistProgress(); return true;
+    }
+
+    function applyPersistentState() {
+      player.hasMantle = isUnlocked('unlockedRelics', 'mantle');
+      player.hasWindPearl = isUnlocked('unlockedRelics', 'pearl');
+    }
+
+    function startChapter(chapter) {
+      if (chapter > progress.chapterUnlocked) return;
+      startMenuEl.classList.remove('visible'); talentPanelEl.classList.remove('visible');
+      overlay.style.display = 'none'; modalOpen = false; gameRunning = true;
+      initGame(); applyPersistentState(); updateUnlockUI();
+      if (chapter === 2) {
+        checkpoint = { map: 'huangfeng', bossIndex: progress.chapter2Checkpoint || 0 };
+        setupHuangfeng(checkpoint.bossIndex); banner = { text: '第二章 · 黄风岭', timer: 180 };
+      } else if (chapter === 3) {
+        startChapter3Intro();
+      }
+    }
 
     // 世界尺寸（远大于屏幕，镜头跟随玩家）。
     const WORLD = { w: 2400, h: 1800 };
@@ -424,7 +627,7 @@
     let stanceIdx = 0;
     const stanceNameEl = document.getElementById('stance-name');
     const combo = { count: 0, timer: 0, window: 100 };
-    const dodge = { active: false, timer: 0, duration: 12, dx: 0, dy: 0, cooldown: 0, maxCooldown: 42 };
+    const dodge = { active: false, timer: 0, duration: 10, dx: 0, dy: 0, cooldown: 0, maxCooldown: 42 };
     // 蓄力：空格长按，松开释放，最高 3 倍伤害。
     const charge = { charging: false, level: 0, max: 90 };
 
@@ -436,9 +639,36 @@
       transform: { cd: 0, maxCd: 1500, el: document.getElementById('skill-transform') },
       pearl: { cd: 0, maxCd: 1800, el: document.getElementById('skill-pearl') }
     };
-    // 广智变身：化为狼战士，攻击翻倍、移动加速，持续一分钟且期间无敌。
-    const transform = { active: false, timer: 0, duration: 3600, dmgMult: 2, speedMult: 1.3 };
+    // 广智变身改为短时间强化；冷却从变身结束后开始。
+    const transform = { active: false, timer: 0, duration: 600, dmgMult: 1.75, speedMult: 1.25 };
+    const mantle = { active: false, timer: 0, duration: 480, cd: 0, maxCd: 1800, el: document.getElementById('skill-mantle') };
     let skillFx = [];
+
+    function applyTalentStats(heal = true) {
+      const oldMax = player.maxHp;
+      player.maxHp = 300 + progress.talents.body * 35;
+      dodge.maxCooldown = Math.max(27, 42 - progress.talents.body * 5);
+      if (heal) player.hp = player.maxHp;
+      else player.hp = Math.min(player.maxHp, player.hp + Math.max(0, player.maxHp - oldMax));
+      updateUI();
+    }
+
+    function skillCooldown(skill) { return Math.round(skill.maxCd * (1 - progress.talents.spell * .1)); }
+
+    function updateUnlockUI() {
+      const mapping = {
+        freeze: ['unlockedSkills','freeze'], sweep: ['unlockedSkills','sweep'],
+        fire: ['unlockedSkills','fire'], transform: ['unlockedSkills','transform'],
+        pearl: ['unlockedRelics','pearl'], mantle: ['unlockedRelics','mantle']
+      };
+      for (const [id, [group,key]] of Object.entries(mapping)) {
+        document.getElementById(`skill-${id}`).classList.toggle('locked', !isUnlocked(group,key));
+      }
+      const available = STANCES.filter(s => isUnlocked('unlockedStances', s.kind));
+      if (!available.some(s => s.kind === STANCES[stanceIdx].kind)) stanceIdx = STANCES.findIndex(s => available.some(a => a.kind === s.kind));
+      stanceNameEl.textContent = STANCES[stanceIdx].name;
+      updateProgressUI();
+    }
 
       // 小怪图鉴：不同血量和习性，攻击方式各异。
     const ENEMY_TYPES = {
@@ -482,6 +712,9 @@
     let bossActive = false;
     let gameRunning = true;
     let frameCount = 0;
+    let lastFrameTime = 0;
+    let frameAccumulator = 0;
+    const FIXED_STEP = 1000 / 60;
 
     function randomRange(min, max) {
       return Math.random() * (max - min) + min;
@@ -637,7 +870,10 @@
       createDamageText(b.x, b.y - 80, '铛——', '#ffd700');
       createParticles(b.x, b.y - 30, '#ffd700', 16);
       skillFx.push({ type: 'ring', x: b.x, y: b.y - 30, life: 1 });
+      setObjective(`第一章 · 黑风山：已敲响山钟 ${bellsRung}/3`);
       if (bellsRung >= 3) {
+        unlock('unlockedSkills', 'sweep', '参悟新法术【横扫六合】！');
+        setObjective('第一章 · 隐藏关：进入旧观音禅院，击败金池长老');
         banner = { text: '三口钟已敲响！前往旧观音禅院……', timer: 150 };
         templeCountdown = 140;
       }
@@ -684,6 +920,7 @@
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 280;
       spawnJinchi();
+      setObjective('第一章 · 旧观音禅院：击败金池长老，夺回避火罩');
       banner = { text: '旧观音禅院', timer: 150 };
       updateUI();
     }
@@ -696,6 +933,7 @@
       player.y = forestState.py;
       bossActive = enemies.some(e => e.isBoss && e.state !== 'idle');
       forestState = null;
+      setObjective('第一章 · 黑风山：携避火罩挑战黑风大王');
       banner = { text: '获得法宝【避火罩】，回到了黑风山', timer: 170 };
       updateUI();
     }
@@ -757,6 +995,7 @@
     }
 
     function enterFutu() {
+      setObjective('第三章 · 浮屠界：穿过塔牢，击败魔将妙音');
       currentMap = 'futu';
       enemies = [];
       peaches = [];
@@ -780,6 +1019,7 @@
 
     // 第三章开场：雪原直路 → 遇小西天土地 → 化蝠飞往小西天。
     function startChapter3Intro() {
+      setObjective('第三章 · 小西天：沿雪原前行，与小西天土地会合');
       currentMap = 'intro';
       introPhase = 'walk';
       enemies = [];
@@ -826,6 +1066,7 @@
 
     // 第三章主场景：冰湖（存档点），黄眉以后天袋召唤亢金龙。
     function enterIcelake() {
+      setObjective('第三章 · 冰湖：迎战黄眉召来的亢金龙');
       currentMap = 'icelake';
       introPhase = null;
       enemies = [];
@@ -918,10 +1159,10 @@
 
     // 第二章 BOSS 连战顺序：沙国王父子 → 石先锋 → 虎先锋 → 黄风大圣。
     const CHAPTER2_BOSSES = [
-      { type: 'shaguo', name: '沙国王父子', hp: 900, dmg: 26, speed: 1.4, radius: 28, aggro: 380, atkCycle: ['melee', 'ranged'] },
-      { type: 'shixian', name: '石先锋', hp: 1100, dmg: 32, speed: 0.9, radius: 36, aggro: 380, atkCycle: ['melee', 'aoe'] },
-      { type: 'huxian', name: '虎先锋', hp: 1300, dmg: 34, speed: 1.7, radius: 30, aggro: 420, atkCycle: ['melee', 'lunge'] },
-      { type: 'huangfeng', name: '黄风大圣', hp: 1500, dmg: 35, speed: 1.5, radius: 32, aggro: 420, atkCycle: ['melee', 'ranged'] }
+      { type: 'shaguo', name: '沙国王父子', zone: '沙门村', objective: '分清父子攻势，优先打断远程施法', x: 430, y: 470, hp: 900, dmg: 26, speed: 1.4, radius: 28, aggro: 380, atkCycle: ['melee', 'ranged'] },
+      { type: 'shixian', name: '石先锋', zone: '挟魂崖', objective: '观察砸地红光，闪避冲击波后反击', x: 1940, y: 430, hp: 1100, dmg: 32, speed: 0.9, radius: 36, aggro: 380, atkCycle: ['melee', 'aoe'] },
+      { type: 'huxian', name: '虎先锋', zone: '卧虎寺', objective: '用完美闪避抓住虎先锋的收招破绽', x: 1200, y: 920, hp: 1300, dmg: 34, speed: 1.7, radius: 30, aggro: 420, atkCycle: ['melee', 'lunge'] },
+      { type: 'huangfeng', name: '黄风大圣', zone: '黄风阵', objective: '完成黄袍员外支线，以定风珠压制黄风', x: 1200, y: 360, hp: 1500, dmg: 35, speed: 1.5, radius: 32, aggro: 420, atkCycle: ['melee', 'ranged'] }
     ];
     let chapter2BossIdx = 0;
     let nextBossCountdown = 0;
@@ -929,11 +1170,14 @@
     // 场上同时只有一个 BOSS：按队列生成当前 BOSS。
     function spawnChapterBoss() {
       const d = CHAPTER2_BOSSES[chapter2BossIdx];
+      if (!d) return;
+      player.x = d.x;
+      player.y = Math.min(WORLD.h - 120, d.y + 330);
       enemies.push({
         type: d.type,
         name: d.name,
-        x: WORLD.w / 2,
-        y: 380,
+        x: d.x,
+        y: d.y,
         radius: d.radius,
         hp: d.hp,
         maxHp: d.hp,
@@ -960,11 +1204,15 @@
         frozen: 0,
         bob: 0
       });
-      banner = { text: `${d.name} 现身！`, timer: 150 };
+      checkpoint = { map: 'huangfeng', bossIndex: chapter2BossIdx };
+      progress.chapter2Checkpoint = chapter2BossIdx;
+      persistProgress();
+      setObjective(`第二章 · ${d.zone}：${d.objective}`);
+      banner = { text: `${d.zone} · ${d.name} 现身！`, timer: 170 };
     }
 
     // 布置黄风岭（进图与阵亡复活共用）。
-    function setupHuangfeng() {
+    function setupHuangfeng(startIndex = 0) {
       currentMap = 'huangfeng';
       enemies = [];
       peaches = [];
@@ -990,13 +1238,11 @@
           pulse: randomRange(0, Math.PI * 2)
         });
       }
-      chapter2BossIdx = 0;
+      chapter2BossIdx = Math.max(0, Math.min(startIndex, CHAPTER2_BOSSES.length - 1));
       nextBossCountdown = 0;
       spawnChapterBoss();
       // 黄袍员外（猪 NPC）守在地图最右侧，完成支线后消失。
       pigNpc = player.sahaliDone ? null : { x: WORLD.w - 180, y: WORLD.h / 2 + 100 };
-      player.x = WORLD.w / 2;
-      player.y = WORLD.h - 260;
       player.hp = player.maxHp;
       player.hurtCooldown = 0;
       bossActive = false;
@@ -1005,15 +1251,17 @@
 
     function enterHuangfeng() {
       // 黄风岭入口即存档点。
-      checkpoint = { map: 'huangfeng' };
-      setupHuangfeng();
+      checkpoint = { map: 'huangfeng', bossIndex: 0 };
+      progress.chapter2Checkpoint = 0;
+      persistProgress();
+      setupHuangfeng(0);
       banner = { text: '第二章 · 黄风岭（存档点）', timer: 180 };
     }
 
     function respawnAtCheckpoint() {
       overlay.style.display = 'none';
-      setupHuangfeng();
-      banner = { text: '于黄风岭存档点复活', timer: 140 };
+      setupHuangfeng(checkpoint?.bossIndex || progress.chapter2Checkpoint || 0);
+      banner = { text: '于黄风岭土地庙复活', timer: 140 };
       gameRunning = true;
       gameLoop();
     }
@@ -1234,6 +1482,10 @@
       transform.active = false;
       transform.timer = 0;
       skills.transform.el.classList.remove('active');
+      mantle.active = false;
+      mantle.timer = 0;
+      mantle.cd = 0;
+      mantle.el.classList.remove('active', 'on-cd');
       combo.count = 0;
       combo.timer = 0;
       dodge.active = false;
@@ -1249,6 +1501,8 @@
       kills = 0;
       bossActive = false;
       frameCount = 0;
+      lastFrameTime = 0;
+      frameAccumulator = 0;
       currentMap = 'forest';
       forestState = null;
       banner = null;
@@ -1276,20 +1530,23 @@
       ch3EndCountdown = 0;
       futuCountdown = 0;
       document.getElementById('slot-sober').style.display = 'none';
-      document.getElementById('skill-pearl').style.display = 'none';
       player.hasMantle = false;
-      document.getElementById('skill-mantle').style.display = 'none';
+      applyPersistentState();
+      player.sahaliDone = player.hasWindPearl;
+      applyTalentStats(true);
       gameRunning = true;
       overlay.style.display = 'none';
       bossHpEl.style.display = 'none';
       spawnBoss();
       scatterWorld();
       spawnBells();
+      setObjective('第一章 · 黑风山：寻找三口山钟，探索隐藏禅院；也可直接挑战黑风大王');
+      updateUnlockUI();
       updateUI();
     }
 
     function startCharge() {
-      if (charge.charging || staff.swinging || staff.cooldown > 0 || !gameRunning) return;
+      if (charge.charging || staff.swinging || staff.cooldown > 0 || !gameRunning || modalOpen) return;
       charge.charging = true;
       charge.level = 0;
     }
@@ -1304,7 +1561,7 @@
     }
 
     function startSwing(power = 1) {
-      if (staff.swinging || staff.cooldown > 0 || !gameRunning) return;
+      if (staff.swinging || staff.cooldown > 0 || !gameRunning || modalOpen) return;
       const st = STANCES[stanceIdx];
       staff.swinging = true;
       staff.timer = staff.duration;
@@ -1345,6 +1602,10 @@
     }
 
     function applyDamage(e, damage) {
+      if (e.frozen > 0 && progress.talents.spell >= 2 && !e.freezeBonusUsed) {
+        damage = Math.round(damage * 1.35);
+        e.freezeBonusUsed = true;
+      }
       e.hp -= damage;
       e.flash = 6;
       createDamageText(e.x, e.y - e.radius * 3, damage);
@@ -1364,8 +1625,10 @@
           bossHpEl.style.display = 'none';
           if (e.name === '金池长老') {
             // 击败金池长老：获得避火罩，短暂停留后回到黑风山。
+            grantBossReward('jinchi', 180);
+            unlock('unlockedSkills', 'transform', '参悟变化【广智变身】！');
+            unlock('unlockedRelics', 'mantle', '获得法宝【避火罩】！');
             player.hasMantle = true;
-            document.getElementById('skill-mantle').style.display = 'block';
             banner = { text: '获得法宝【避火罩】！', timer: 170 };
             returnCountdown = 200;
             updateUI();
@@ -1373,6 +1636,11 @@
           }
           if (e.name === '黑风大王') {
             // 第一章通关：前往第二章黄风岭。
+            grantBossReward('black-wind', 220);
+            unlock('unlockedSkills', 'sweep', '参悟新法术【横扫六合】！');
+            unlock('unlockedStances', 'vault', '参悟新棍式【立棍】！');
+            progress.chapterUnlocked = Math.max(2, progress.chapterUnlocked);
+            persistProgress();
             banner = { text: '黑风山已破！前往黄风岭……', timer: 170 };
             chapterCountdown = 200;
             updateUI();
@@ -1381,12 +1649,21 @@
           if (currentMap === 'huangfeng') {
             if (e.name === '黄风大圣') {
               // 第二章通关：进入第三章开场剧情。
+              grantBossReward('huangfeng', 320);
+              progress.chapterUnlocked = Math.max(3, progress.chapterUnlocked);
+              progress.chapter2Checkpoint = 0;
+              persistProgress();
               banner = { text: '黄风大圣已灭！', timer: 150 };
               introCountdown = 190;
               updateUI();
               return false;
             }
             // BOSS 逐一现身：击败当前 BOSS 后，下一位稍后出现。
+            grantBossReward(e.type, 180 + chapter2BossIdx * 30);
+            if (e.name === '沙国王父子') unlock('unlockedSkills', 'fire', '参悟新法术【火眼金睛】！');
+            if (e.name === '虎先锋') unlock('unlockedStances', 'thrust', '参悟新棍式【戳棍】！');
+            progress.chapter2Checkpoint = Math.min(3, chapter2BossIdx + 1);
+            persistProgress();
             if (e.name === '石先锋') {
               // 获得醒酒石，可唤醒最右侧的黄袍员外。
               player.hasSoberStone = true;
@@ -1401,8 +1678,9 @@
           }
           if (e.name === '蝜蝂') {
             // 隐藏副本通关：获得定风珠，回到黄风岭。
+            grantBossReward('fuban', 240);
+            unlock('unlockedRelics', 'pearl', '获得法宝【定风珠】！');
             player.hasWindPearl = true;
-            document.getElementById('skill-pearl').style.display = 'block';
             banner = { text: '获得法宝【定风珠】！', timer: 170 };
             pearlCountdown = 220;
             updateUI();
@@ -1410,6 +1688,7 @@
           }
           if (e.name === '亢金龙') {
             // 亢金龙已灭，赤尻马猴现身掳人。
+            grantBossReward('kangjinlong', 260);
             banner = { text: '亢金龙已灭！赤尻马猴将你掳走了……', timer: 180 };
             futuCountdown = 210;
             updateUI();
@@ -1417,6 +1696,9 @@
           }
           if (e.name === '魔将妙音') {
             // 第三章最终 BOSS 已灭。
+            grantBossReward('miaoyin', 360);
+            progress.completedChapter3 = true;
+            persistProgress();
             banner = { text: '魔将妙音已灭！', timer: 150 };
             ch3EndCountdown = 190;
             updateUI();
@@ -1428,6 +1710,11 @@
         }
         score += e.score;
         kills++;
+        progress.spirit += Math.max(6, Math.round(e.score * .6));
+        if (progress.talents.spell >= 3) {
+          for (const skill of Object.values(skills)) skill.cd = Math.max(0, skill.cd - skill.maxCd * .05);
+        }
+        persistProgress();
       }
       updateUI();
       return false;
@@ -1435,10 +1722,10 @@
 
     function checkAttackHits() {
       const st = STANCES[stanceIdx];
-      const comboMult = 1 + (combo.count - 1) * 0.35;
-      const power = (player.empowered ? 2 : 1) * staff.power;
+      const comboMult = 1 + (combo.count - 1) * (progress.talents.staff >= 2 ? .5 : .35);
+      const power = (player.empowered ? (progress.talents.body >= 3 ? 2.5 : 2) : 1) * staff.power;
       player.empowered = false;
-      const mult = st.dmg * comboMult * power;
+      const mult = st.dmg * comboMult * power * (1 + progress.talents.staff * .12);
 
       if (st.kind === 'vault') {
         // 立棍：砸向面前落点的范围伤害。
@@ -1481,29 +1768,33 @@
         createParticles(ix, iy, '#c9b995', 10);
         tryRingBells(st.range, st.arc, player.angle);
       }
+      if (progress.talents.staff >= 3 && staff.power >= 2.9) {
+        for (const e of enemies) if (!e.isBoss && Math.hypot(e.x-player.x,e.y-player.y) < st.range + 80) e.frozen = Math.max(e.frozen,45);
+      }
       handleKills();
     }
 
     // 定身术：定住附近的怪物。
     function castFreeze() {
       const s = skills.freeze;
-      if (s.cd > 0 || !gameRunning) return;
+      if (!isUnlocked('unlockedSkills','freeze') || s.cd > 0 || !gameRunning || modalOpen) return;
       let hit = false;
       for (const e of enemies) {
         if (Math.hypot(e.x - player.x, e.y - player.y) > 420) continue;
         e.frozen = FREEZE_DURATION;
+        e.freezeBonusUsed = false;
         hit = true;
       }
       if (!hit) return;
-      s.cd = s.maxCd;
+      s.cd = skillCooldown(s);
       skillFx.push({ type: 'freezewave', life: 1 });
     }
 
     // 横扫六合：以自身为中心的范围重击。
     function castSweep() {
       const s = skills.sweep;
-      if (s.cd > 0 || !gameRunning) return;
-      s.cd = s.maxCd;
+      if (!isUnlocked('unlockedSkills','sweep') || s.cd > 0 || !gameRunning || modalOpen) return;
+      s.cd = skillCooldown(s);
       let hit = false;
       for (const e of enemies) {
         const dx = e.x - player.x;
@@ -1525,7 +1816,7 @@
     // 火眼金睛：金光重创视野内最近的怪物。
     function castFire() {
       const s = skills.fire;
-      if (s.cd > 0 || !gameRunning) return;
+      if (!isUnlocked('unlockedSkills','fire') || s.cd > 0 || !gameRunning || modalOpen) return;
       let target = null;
       let bestDist = Infinity;
       for (const e of enemies) {
@@ -1536,7 +1827,7 @@
         }
       }
       if (!target) return;
-      s.cd = s.maxCd;
+      s.cd = skillCooldown(s);
       skillFx.push({ type: 'beam', x1: player.x, y1: player.y, x2: target.x, y2: target.y - target.radius, life: 1 });
       applyDamage(target, 120);
       handleKills();
@@ -1544,8 +1835,7 @@
 
     function castTransform() {
       const s = skills.transform;
-      if (s.cd > 0 || transform.active || !gameRunning) return;
-      s.cd = s.maxCd;
+      if (!isUnlocked('unlockedSkills','transform') || s.cd > 0 || transform.active || !gameRunning || modalOpen) return;
       transform.active = true;
       transform.timer = transform.duration;
       createParticles(player.x, player.y, '#ff7a2a', 24);
@@ -1554,11 +1844,18 @@
     // 定风珠：定住全场妖怪 10 秒。
     function castPearl() {
       const s = skills.pearl;
-      if (!player.hasWindPearl || s.cd > 0 || !gameRunning || enemies.length === 0) return;
-      s.cd = s.maxCd;
-      for (const e of enemies) e.frozen = 600;
+      if (!isUnlocked('unlockedRelics','pearl') || s.cd > 0 || !gameRunning || modalOpen || enemies.length === 0) return;
+      s.cd = skillCooldown(s);
+      for (const e of enemies) e.frozen = e.type === 'huangfeng' ? 240 : 360;
       skillFx.push({ type: 'freezewave', life: 1 });
-      banner = { text: '定风珠！群妖镇住 10 秒', timer: 100 };
+      banner = { text: '定风珠起，黄风暂歇！', timer: 100 };
+    }
+
+    function castMantle() {
+      if (!isUnlocked('unlockedRelics','mantle') || mantle.cd > 0 || mantle.active || !gameRunning || modalOpen) return;
+      mantle.active = true; mantle.timer = mantle.duration;
+      createParticles(player.x, player.y, '#ff8a3a', 28);
+      banner = { text: '避火罩护体：8秒内减伤60%', timer: 100 };
     }
 
     function updateSkills() {
@@ -1583,6 +1880,7 @@
         el.classList.remove('on-cd');
         if (transform.timer <= 0) {
           transform.active = false;
+          skills.transform.cd = skillCooldown(skills.transform);
           el.classList.remove('active');
         }
         // 变身余烬。
@@ -1598,6 +1896,21 @@
           });
         }
       }
+      if (mantle.cd > 0) mantle.cd--;
+      if (mantle.active) {
+        mantle.timer--;
+        mantle.el.classList.add('active');
+        mantle.el.classList.remove('on-cd');
+        mantle.el.querySelector('.cd').textContent = Math.ceil(mantle.timer / 60) + 's';
+        if (mantle.timer <= 0) {
+          mantle.active = false; mantle.cd = mantle.maxCd; mantle.el.classList.remove('active');
+        }
+      } else if (mantle.cd > 0) {
+        mantle.el.classList.add('on-cd');
+        mantle.el.querySelector('.cd').textContent = Math.ceil(mantle.cd / 60) + 's';
+      } else {
+        mantle.el.classList.remove('on-cd'); mantle.el.querySelector('.cd').textContent = '';
+      }
       for (let i = skillFx.length - 1; i >= 0; i--) {
         skillFx[i].life -= 0.045;
         if (skillFx[i].life <= 0) skillFx.splice(i, 1);
@@ -1605,7 +1918,7 @@
     }
 
     function startDodge(dx, dy) {
-      if (dodge.active || dodge.cooldown > 0 || !gameRunning) return;
+      if (dodge.active || dodge.cooldown > 0 || !gameRunning || modalOpen) return;
       dodge.active = true;
       dodge.timer = dodge.duration;
       dodge.dx = dx;
@@ -1698,10 +2011,12 @@
       camera.y = clamp(player.y - canvas.height / 2, 0, WORLD.h - canvas.height);
     }
 
-    // 受击结算（避火罩减伤 40%，广智变身期间无敌）。
+    // 变身与主动避火罩提供减伤，避免永久无敌。
     function hurtPlayer(dmg) {
-      if (transform.active) return;
-      const real = player.hasMantle ? Math.round(dmg * 0.6) : dmg;
+      let multiplier = 1;
+      if (transform.active) multiplier *= .3;
+      if (mantle.active) multiplier *= .4;
+      const real = Math.max(1, Math.round(dmg * multiplier));
       player.hp -= real;
       player.hurtCooldown = player.maxHurtCooldown;
       createDamageText(player.x, player.y - 40, real, '#ff5252');
@@ -1714,6 +2029,7 @@
       createDamageText(player.x, player.y - 60, '完美闪避!', '#ffd700');
       createParticles(player.x, player.y, '#ffd700', 16);
       player.empowered = true;
+      if (progress.talents.body >= 2) player.hp = Math.min(player.maxHp, player.hp + 15);
       for (const o of enemies) {
         if (!o.isBoss) o.frozen = Math.max(o.frozen, 45);
       }
@@ -1846,7 +2162,7 @@
               createParticles(e.x, e.y, '#ff3b30', 12);
             } else {
               // 近战挥击。
-              if (dodge.active) {
+              if (dodge.active && dist < e.radius + player.r + (e.heavy ? 44 : 30)) {
                 triggerPerfectDodge();
               } else if (dist < e.radius + player.r + (e.heavy ? 44 : 30) && player.hurtCooldown <= 0) {
                 hurtPlayer(Math.round(e.dmg * (e.heavy ? 1.5 : 1)));
@@ -4435,7 +4751,7 @@
       ctx.fill();
 
       // 避火罩：金色护体光环。
-      if (player.hasMantle) {
+      if (mantle.active) {
         ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
         ctx.beginPath();
         ctx.arc(0, -r * 1.6, r * 2, 0, Math.PI * 2);
@@ -4927,24 +5243,19 @@
       drawHurtFlash();
     }
 
-    function gameLoop() {
+    function gameLoop(time = performance.now()) {
       if (!gameRunning) return;
-
-      frameCount++;
-      updatePlayer();
-      updateStaff();
-      updateSkills();
-      updateEnemies();
-      updatePeaches();
-      updateBells();
-      updateAlly();
-      updatePigNpc();
-      updateIntro();
-      updateIcelake();
-      updateProjectiles();
-      updateParticles();
-      updateSlashes();
-      updateDamageTexts();
+      if (!lastFrameTime) lastFrameTime = time;
+      frameAccumulator += Math.min(100, Math.max(0, time - lastFrameTime));
+      lastFrameTime = time;
+      if (modalOpen) frameAccumulator = 0;
+      while (!modalOpen && frameAccumulator >= FIXED_STEP) {
+        frameCount++;
+        updatePlayer(); updateStaff(); updateSkills(); updateEnemies(); updatePeaches();
+        updateBells(); updateAlly(); updatePigNpc(); updateIntro(); updateIcelake();
+        updateProjectiles(); updateParticles(); updateSlashes(); updateDamageTexts();
+        frameAccumulator -= FIXED_STEP;
+      }
       draw();
 
       requestAnimationFrame(gameLoop);
@@ -4963,6 +5274,7 @@
     function restartGame() {
       // 有存档点则于存档点复活，否则从头开始。
       if (checkpoint && checkpoint.map === 'huangfeng' && currentMap === 'huangfeng') {
+        lastFrameTime = 0; frameAccumulator = 0;
         respawnAtCheckpoint();
         return;
       }
@@ -4971,6 +5283,7 @@
         enterIcelake();
         banner = { text: '于冰湖存档点复活', timer: 140 };
         gameRunning = true;
+        lastFrameTime = 0; frameAccumulator = 0;
         gameLoop();
         return;
       }
@@ -4979,6 +5292,7 @@
         enterFutu();
         banner = { text: '于浮屠界存档点复活', timer: 140 };
         gameRunning = true;
+        lastFrameTime = 0; frameAccumulator = 0;
         gameLoop();
         return;
       }
@@ -4986,11 +5300,31 @@
       gameLoop();
     }
 
+    function returnToMenu() {
+      overlay.style.display = 'none'; startMenuEl.classList.add('visible');
+      modalOpen = true; gameRunning = true; lastFrameTime = 0; frameAccumulator = 0;
+      updateProgressUI(); gameLoop();
+    }
+
+    function cycleStance() {
+      let next = stanceIdx;
+      do { next = (next + 1) % STANCES.length; }
+      while (!isUnlocked('unlockedStances', STANCES[next].kind) && next !== stanceIdx);
+      stanceIdx = next; stanceNameEl.textContent = STANCES[stanceIdx].name;
+    }
+
     window.addEventListener('keydown', (e) => {
       keys[e.key] = true;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
         e.preventDefault();
       }
+      if (e.key === 't' || e.key === 'T') {
+        if (talentPanelEl.classList.contains('visible')) closeTalentPanel();
+        else if (!startMenuEl.classList.contains('visible')) openTalentPanel(false);
+        return;
+      }
+      if (modalOpen) return;
+      if (e.repeat && ['q','Q','1','2','3','4','5','6','Shift'].includes(e.key)) return;
       if (e.key === ' ') {
         startCharge();
       }
@@ -5002,9 +5336,9 @@
       if (e.key === '3') castFire();
       if (e.key === '4') castTransform();
       if (e.key === '5') castPearl();
+      if (e.key === '6') castMantle();
       if (e.key === 'q' || e.key === 'Q') {
-        stanceIdx = (stanceIdx + 1) % STANCES.length;
-        stanceNameEl.textContent = STANCES[stanceIdx].name;
+        cycleStance();
       }
       if (e.key === 'Shift') {
         const dx = player.moveDx || Math.cos(player.angle);
@@ -5019,6 +5353,12 @@
     window.addEventListener('keyup', (e) => {
       keys[e.key] = false;
       if (e.key === ' ') releaseCharge();
+    });
+
+    window.addEventListener('blur', () => {
+      for (const key of Object.keys(keys)) keys[key] = false;
+      joy.active = false;
+      if (charge.charging) releaseCharge();
     });
 
     canvas.addEventListener('mousedown', () => {
@@ -5096,8 +5436,7 @@
       btn.addEventListener('touchstart', (e) => {
         const act = btn.dataset.act;
         if (act === 'stance') {
-          stanceIdx = (stanceIdx + 1) % STANCES.length;
-          stanceNameEl.textContent = STANCES[stanceIdx].name;
+          cycleStance();
         } else if (act === 'dodge') {
           startDodge(player.moveDx || Math.cos(player.angle), player.moveDy || Math.sin(player.angle));
         } else if (act === 'freeze') castFreeze();
@@ -5105,6 +5444,8 @@
         else if (act === 'fire') castFire();
         else if (act === 'transform') castTransform();
         else if (act === 'pearl') castPearl();
+        else if (act === 'mantle') castMantle();
+        else if (act === 'talent') openTalentPanel(false);
         e.preventDefault();
       }, { passive: false });
     }
