@@ -130,6 +130,7 @@ for (const [type, isBoss, radius] of [
   ['boss', true, 34], ['jinchi', true, 30], ['shaguo', true, 28],
   ['shixian', true, 36], ['huxian', true, 30], ['huangfeng', true, 32],
   ['fuban', true, 40], ['kanglong', true, 34], ['miaoyin', true, 44],
+  ['buneng', true, 35], ['bubai', true, 31], ['bujing', true, 36], ['bukong', true, 33],
   ['wolf', false, 20], ['snake', false, 14], ['golem', false, 26], ['rat', false, 15]
 ]) {
   run(`(() => { const e = { type:'${type}', name:'攻击动作验收', x:player.x, y:player.y, radius:${radius}, hp:100, maxHp:100, dmg:10, speed:1, aggro:9999, isBoss:${isBoss}, atk:'melee', lastAttack:'melee', attackAlt:1, heavy:false, state:'windup', windup:16, windupMax:32, recover:0, flash:0, frozen:0, bob:0, attackDirX:1, attackDirY:0, attackAnimT:0, attackAnimMax:16, lungeT:0, aoeT:0 }; drawEnemy(e); })()`);
@@ -170,6 +171,25 @@ if (run("currentMap") !== 'kuhai' || !run('progress.reachedKuhai') || run("progr
 if (!run("objectiveEl.textContent.includes('苦海北岸')")) throw new Error('苦海场景缺少任务指引');
 run('draw();');
 
+run("kuhaiPhase = 'explore'; player.y = 300; updateKuhai();");
+if (run("currentMap") !== 'leiyin' || run("enemies[0].name") !== '不能' || !run('progress.reachedLeiyin')) {
+  throw new Error('苦海未正确衔接小雷音寺与不能战');
+}
+for (const [index, name, type] of [
+  [0, '不能', 'buneng'], [1, '不白', 'bubai'], [2, '不净', 'bujing'], [3, '不空', 'bukong']
+]) {
+  if (run("enemies[0].name") !== name || run('leiyinBossIdx') !== index) throw new Error(`${name} 没有按顺序出现`);
+  run('draw(); enemies[0].hp = 0; handleKills();');
+  if (!run(`progress.bossRewards.includes('${type}')`)) throw new Error(`${name} 击败奖励未记录`);
+  if (index < 3) {
+    if (run('nextLeiyinBossCountdown') <= 0) throw new Error(`${name} 战后未准备下一场`);
+    run('for (let i = 0; i < 170; i++) updateBells();');
+  }
+}
+if (!run('progress.completedLeiyinGuardians') || run('progress.leiyinBossIndex') !== 4 || !run("objectiveEl.textContent.includes('四护法已破')")) {
+  throw new Error('不能、不白、不净、不空连战未正确完成');
+}
+
 run('castTransform();');
 if (!run('transform.active') || run('skills.transform.cd') !== 0) throw new Error('变身启动状态不正确');
 run('for (let i = 0; i < transform.duration; i++) updateSkills();');
@@ -178,4 +198,4 @@ if (run('transform.active') || run('skills.transform.cd') <= 0) throw new Error(
 if (!storage.has('haWukongProgressV3')) throw new Error('升级进度未写入本地存档');
 if (!source.includes('FIXED_STEP') || !source.includes('frameAccumulator')) throw new Error('缺少固定时间步保护');
 
-console.log('验收通过：Boss 与小怪攻击动作、三章苦海衔接、左下角三资源条、五段轻棍、移动端基础、成长奖励、土地庙、定风珠、变身平衡与本地存档均可运行。');
+console.log('验收通过：小雷音寺四护法连战、Boss 与小怪攻击动作、三章苦海衔接、左下角三资源条、五段轻棍、移动端基础、成长奖励、土地庙、定风珠、变身平衡与本地存档均可运行。');

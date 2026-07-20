@@ -500,7 +500,8 @@
     const SAVE_KEY = 'haWukongProgressV3';
     const DEFAULT_PROGRESS = {
       spirit: 0, cultivation: 0, chapterUnlocked: 1, chapter2Checkpoint: 0,
-      chapter3Checkpoint: 'intro', reachedKuhai: false,
+      chapter3Checkpoint: 'intro', reachedKuhai: false, reachedLeiyin: false,
+      leiyinBossIndex: 0, completedLeiyinGuardians: false,
       unlockedStances: ['chop'], unlockedSkills: ['freeze'], unlockedRelics: [],
       talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false
     };
@@ -512,10 +513,16 @@
         const bossRewards = [...new Set(list(raw.bossRewards))];
         // 旧版曾把妙音误当作第三章终点，为这批存档直接续上苦海。
         const reachedKuhai = Boolean(raw.reachedKuhai || bossRewards.includes('miaoyin'));
+        const guardianIds = ['buneng', 'bubai', 'bujing', 'bukong'];
+        const defeatedGuardians = guardianIds.filter(id => bossRewards.includes(id)).length;
+        const reachedLeiyin = Boolean(raw.reachedLeiyin || defeatedGuardians > 0);
         return {
           ...DEFAULT_PROGRESS, ...raw,
           reachedKuhai,
-          chapter3Checkpoint: raw.chapter3Checkpoint || (reachedKuhai ? 'kuhai' : 'intro'),
+          reachedLeiyin,
+          leiyinBossIndex: Math.max(raw.leiyinBossIndex || 0, defeatedGuardians),
+          completedLeiyinGuardians: Boolean(raw.completedLeiyinGuardians || defeatedGuardians === guardianIds.length),
+          chapter3Checkpoint: raw.chapter3Checkpoint || (reachedLeiyin ? 'leiyin' : reachedKuhai ? 'kuhai' : 'intro'),
           completedChapter3: raw.reachedKuhai ? Boolean(raw.completedChapter3) : false,
           talents: { ...DEFAULT_PROGRESS.talents, ...(raw.talents || {}) },
           unlockedStances: [...new Set(['chop', ...list(raw.unlockedStances)])],
@@ -545,6 +552,10 @@
       document.getElementById('chapter3-button').disabled = progress.chapterUnlocked < 3;
       document.getElementById('save-summary').textContent = progress.completedChapter3
         ? '第三章已通关 · 可继续完善流派与重玩章节'
+        : progress.completedLeiyinGuardians
+          ? '第三章进行中 · 小雷音寺四护法已破'
+        : progress.reachedLeiyin
+          ? `第三章进行中 · 小雷音寺 ${progress.leiyinBossIndex}/4`
         : progress.reachedKuhai
           ? '第三章进行中 · 已抵达苦海北岸'
         : `最高章节：第${progress.chapterUnlocked}章 · 已投入修行点：${Object.values(progress.talents).reduce((a,b) => a+b, 0)}`;
@@ -622,7 +633,8 @@
         checkpoint = { map: 'huangfeng', bossIndex: progress.chapter2Checkpoint || 0 };
         setupHuangfeng(checkpoint.bossIndex); banner = { text: '第二章 · 黄风岭', timer: 180 };
       } else if (chapter === 3) {
-        if (progress.chapter3Checkpoint === 'kuhai' || progress.reachedKuhai) enterKuhai();
+        if (progress.chapter3Checkpoint === 'leiyin' || progress.reachedLeiyin) setupLeiyin(progress.leiyinBossIndex || 0);
+        else if (progress.chapter3Checkpoint === 'kuhai' || progress.reachedKuhai) enterKuhai();
         else startChapter3Intro();
       }
     }
@@ -777,6 +789,8 @@
     let kuhaiCountdown = 0;
     let kuhaiPhase = null;
     let kuhaiTimer = 0;
+    let leiyinBossIdx = 0;
+    let nextLeiyinBossCountdown = 0;
     let score = 0;
     let kills = 0;
     let bossActive = false;
@@ -1026,6 +1040,10 @@
       if (introCountdown > 0 && --introCountdown === 0) startChapter3Intro();
       if (futuCountdown > 0 && --futuCountdown === 0) enterFutu();
       if (kuhaiCountdown > 0 && --kuhaiCountdown === 0) enterKuhai();
+      if (currentMap === 'leiyin' && nextLeiyinBossCountdown > 0 && --nextLeiyinBossCountdown === 0) {
+        leiyinBossIdx++;
+        spawnLeiyinBoss();
+      }
     }
 
     // 浮屠界：魔将妙音镇守的高塔战场。
@@ -1194,11 +1212,107 @@
     }
 
     function updateKuhai() {
-      if (currentMap !== 'kuhai' || kuhaiPhase !== 'arrive') return;
-      if (--kuhaiTimer <= 0) {
+      if (currentMap !== 'kuhai') return;
+      if (kuhaiPhase === 'arrive' && --kuhaiTimer <= 0) {
         kuhaiPhase = 'explore';
         banner = { text: '苦海无涯，龟岛就在风雪尽头……', timer: 180 };
       }
+      if (kuhaiPhase === 'explore' && player.y < 360) enterLeiyin();
+    }
+
+    // 小雷音寺四护法连战：不能 → 不白 → 不净 → 不空。
+    const LEIYIN_BOSSES = [
+      { type: 'buneng', name: '不能', zone: '山门雪庭', objective: '避开重拳与砸地震波', hp: 1700, dmg: 38, speed: 1.15, radius: 35, atkCycle: ['melee', 'aoe'] },
+      { type: 'bubai', name: '不白', zone: '天王殿', objective: '看清双刃连斩与骤然突进', hp: 1850, dmg: 40, speed: 1.75, radius: 31, atkCycle: ['melee', 'lunge'] },
+      { type: 'bujing', name: '不净', zone: '戒坛', objective: '绕开禅杖横扫，趁砸地后反击', hp: 2050, dmg: 43, speed: 1.25, radius: 36, atkCycle: ['aoe', 'melee', 'ranged'] },
+      { type: 'bukong', name: '不空', zone: '大雄宝殿', objective: '辨清佛珠术法与瞬身掌击', hp: 2300, dmg: 46, speed: 1.55, radius: 33, atkCycle: ['ranged', 'lunge', 'melee'] }
+    ];
+
+    function spawnLeiyinBoss() {
+      const d = LEIYIN_BOSSES[leiyinBossIdx];
+      if (!d) {
+        bossActive = false;
+        bossHpEl.style.display = 'none';
+        setObjective('第三章 · 小雷音寺：四护法已破，深入大殿寻找黄眉');
+        return;
+      }
+      const x = WORLD.w / 2;
+      const y = 500;
+      enemies.push({
+        type: d.type,
+        name: d.name,
+        x,
+        y,
+        radius: d.radius,
+        hp: d.hp,
+        maxHp: d.hp,
+        dmg: d.dmg,
+        speed: d.speed,
+        aggro: 9999,
+        isBoss: true,
+        atk: d.atkCycle[0],
+        atkCycle: d.atkCycle,
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'chase',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: leiyinBossIdx * 1.7
+      });
+      bossActive = true;
+      checkpoint = { map: 'leiyin', bossIndex: leiyinBossIdx };
+      progress.reachedLeiyin = true;
+      progress.chapter3Checkpoint = 'leiyin';
+      progress.leiyinBossIndex = leiyinBossIdx;
+      persistProgress();
+      setObjective(`第三章 · ${d.zone}：击败${d.name}，${d.objective}`);
+      banner = { text: `${d.zone} · ${d.name} 现身！`, timer: 180 };
+      createParticles(x, y - d.radius, '#e9c86a', 24);
+      updateUI();
+    }
+
+    function setupLeiyin(startIndex = 0) {
+      currentMap = 'leiyin';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      ally = null;
+      huangmei = null;
+      bossActive = false;
+      bossHpEl.style.display = 'none';
+      nextLeiyinBossCountdown = 0;
+      leiyinBossIdx = Math.max(0, Math.min(startIndex, LEIYIN_BOSSES.length));
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 300;
+      refillResources();
+      for (let i = 0; i < 5; i++) {
+        peaches.push({
+          x: randomRange(420, WORLD.w - 420),
+          y: randomRange(760, WORLD.h - 260),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      progress.reachedLeiyin = true;
+      progress.chapter3Checkpoint = 'leiyin';
+      progress.leiyinBossIndex = leiyinBossIdx;
+      persistProgress();
+      checkpoint = { map: 'leiyin', bossIndex: leiyinBossIdx };
+      banner = { text: '第三章 · 小雷音寺', timer: 190 };
+      spawnLeiyinBoss();
+    }
+
+    function enterLeiyin() {
+      setupLeiyin(progress.leiyinBossIndex || 0);
     }
 
     function spawnKangjinlong() {
@@ -1662,6 +1776,8 @@
       kuhaiCountdown = 0;
       kuhaiPhase = null;
       kuhaiTimer = 0;
+      leiyinBossIdx = 0;
+      nextLeiyinBossCountdown = 0;
       document.getElementById('slot-sober').style.display = 'none';
       player.hasMantle = false;
       applyPersistentState();
@@ -1796,6 +1912,29 @@
             chapterCountdown = 200;
             updateUI();
             return false;
+          }
+          if (currentMap === 'leiyin') {
+            const defeatedIdx = LEIYIN_BOSSES.findIndex(d => d.type === e.type);
+            if (defeatedIdx >= 0) {
+              grantBossReward(e.type, 280 + defeatedIdx * 40);
+              const nextIndex = defeatedIdx + 1;
+              bossActive = false;
+              progress.leiyinBossIndex = nextIndex;
+              progress.chapter3Checkpoint = 'leiyin';
+              checkpoint = { map: 'leiyin', bossIndex: nextIndex };
+              if (nextIndex >= LEIYIN_BOSSES.length) {
+                progress.completedLeiyinGuardians = true;
+                persistProgress();
+                setObjective('第三章 · 小雷音寺：四护法已破，深入大殿寻找黄眉');
+                banner = { text: '不能、不白、不净、不空皆已伏诛！', timer: 220 };
+              } else {
+                persistProgress();
+                banner = { text: `${e.name}已灭！继续深入小雷音寺……`, timer: 160 };
+                nextLeiyinBossCountdown = 170;
+              }
+              updateUI();
+              return false;
+            }
           }
           if (currentMap === 'huangfeng') {
             if (e.name === '黄风大圣') {
@@ -2394,6 +2533,71 @@
     // ---------- 绘制 ----------
 
     function drawGround() {
+      if (currentMap === 'leiyin') {
+        // 小雷音寺：积雪覆盖的灰白石庭，中轴铺着暗红朝道。
+        const stone = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        stone.addColorStop(0, '#b8bec0');
+        stone.addColorStop(1, '#d9dddc');
+        ctx.fillStyle = stone;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const tile = 105;
+        const ox = -(camera.x % tile);
+        const oy = -(camera.y % tile);
+        ctx.strokeStyle = 'rgba(73,79,80,.28)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let x = ox; x < canvas.width; x += tile) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+        }
+        for (let y = oy; y < canvas.height; y += tile) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+
+        // 贯穿山门与大殿的朝道。
+        const roadX = WORLD.w / 2 - camera.x;
+        ctx.fillStyle = 'rgba(111,35,31,.72)';
+        ctx.fillRect(roadX - 145, -camera.y, 290, WORLD.h);
+        ctx.strokeStyle = 'rgba(221,179,82,.75)';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(roadX - 145, 0);
+        ctx.lineTo(roadX - 145, canvas.height);
+        ctx.moveTo(roadX + 145, 0);
+        ctx.lineTo(roadX + 145, canvas.height);
+        ctx.stroke();
+
+        // 墙角和石缝里的积雪。
+        for (let i = 0; i < 120; i++) {
+          const gx = seeded(i + 18600) * WORLD.w;
+          const gy = seeded(i + 19000) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -80 || sy < -50 || sx > canvas.width + 80 || sy > canvas.height + 50) continue;
+          if (Math.abs(gx - WORLD.w / 2) < 175) continue;
+          ctx.fillStyle = `rgba(242,247,247,${.32 + seeded(i + 19400) * .38})`;
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 22 + seeded(i) * 42, 8 + seeded(i + 1) * 16, seeded(i + 2) * 2.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 山中细雪。
+        ctx.strokeStyle = 'rgba(248,252,252,.55)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 18; i++) {
+          const sx = ((seeded(i + 19800) * (canvas.width + 180) + frameCount * 1.5) % (canvas.width + 180)) - 90;
+          const sy = (seeded(i + 20200) * canvas.height + frameCount * 2.2) % canvas.height;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + 8, sy + 13);
+          ctx.stroke();
+        }
+        return;
+      }
+
       if (currentMap === 'kuhai') {
         // 苦海北岸：下方是积雪海岸，上方是被寒雾吞没的幽蓝海面。
         const shoreY = 1450 - camera.y;
@@ -2724,6 +2928,122 @@
     }
 
     function drawDecor() {
+      if (currentMap === 'leiyin') {
+        const cx = WORLD.w / 2;
+
+        // 世界顶部的小雷音寺主殿。
+        const hx = cx - camera.x;
+        const hy = 300 - camera.y;
+        if (hy > -360 && hy < canvas.height + 180) {
+          ctx.fillStyle = 'rgba(20,22,22,.3)';
+          ctx.fillRect(hx - 470, hy + 72, 940, 55);
+          ctx.fillStyle = '#7e2926';
+          ctx.fillRect(hx - 420, hy - 85, 840, 180);
+          // 红柱和金色柱础。
+          for (let i = -4; i <= 4; i++) {
+            const px = hx + i * 92;
+            ctx.fillStyle = '#8f2723';
+            ctx.fillRect(px - 13, hy - 92, 26, 190);
+            ctx.fillStyle = '#c69a42';
+            ctx.fillRect(px - 18, hy + 82, 36, 17);
+          }
+          // 重檐金顶。
+          ctx.fillStyle = '#49372a';
+          ctx.beginPath();
+          ctx.moveTo(hx - 510, hy - 90);
+          ctx.lineTo(hx - 360, hy - 205);
+          ctx.lineTo(hx + 360, hy - 205);
+          ctx.lineTo(hx + 510, hy - 90);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#d4aa4e';
+          ctx.lineWidth = 13;
+          ctx.beginPath();
+          ctx.moveTo(hx - 515, hy - 90);
+          ctx.quadraticCurveTo(hx, hy - 150, hx + 515, hy - 90);
+          ctx.stroke();
+          ctx.fillStyle = '#d8ad4d';
+          ctx.beginPath();
+          ctx.arc(hx, hy - 224, 18, 0, Math.PI * 2);
+          ctx.fill();
+          // 正门与寺额。
+          ctx.fillStyle = '#30221b';
+          ctx.fillRect(hx - 88, hy - 54, 176, 150);
+          ctx.fillStyle = '#c99a3f';
+          ctx.fillRect(hx - 76, hy - 128, 152, 42);
+          ctx.fillStyle = '#2b1c12';
+          ctx.font = 'bold 25px serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('小雷音寺', hx, hy - 98);
+          ctx.textAlign = 'left';
+        }
+
+        // 南侧山门，玩家由苦海进入时穿过此处。
+        const gy = 1540 - camera.y;
+        if (gy > -220 && gy < canvas.height + 180) {
+          const gx = cx - camera.x;
+          ctx.fillStyle = '#702421';
+          ctx.fillRect(gx - 260, gy - 105, 50, 115);
+          ctx.fillRect(gx + 210, gy - 105, 50, 115);
+          ctx.fillStyle = '#49372a';
+          ctx.beginPath();
+          ctx.moveTo(gx - 320, gy - 105);
+          ctx.lineTo(gx - 230, gy - 175);
+          ctx.lineTo(gx + 230, gy - 175);
+          ctx.lineTo(gx + 320, gy - 105);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#cfa348';
+          ctx.lineWidth = 9;
+          ctx.beginPath();
+          ctx.moveTo(gx - 325, gy - 105);
+          ctx.quadraticCurveTo(gx, gy - 140, gx + 325, gy - 105);
+          ctx.stroke();
+        }
+
+        // 中轴两侧的石灯与香炉。
+        const lamps = [620, 860, 1100, 1330];
+        for (const y of lamps) {
+          for (const side of [-1, 1]) {
+            const sx = cx + side * 255 - camera.x;
+            const sy = y - camera.y;
+            if (sy < -100 || sy > canvas.height + 100) continue;
+            ctx.fillStyle = 'rgba(0,0,0,.2)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy + 6, 28, 9, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#666c6d';
+            ctx.fillRect(sx - 12, sy - 62, 24, 65);
+            ctx.fillRect(sx - 22, sy - 69, 44, 12);
+            ctx.fillStyle = '#e7b64f';
+            ctx.shadowColor = '#ffb23e';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(sx, sy - 78, 8 + Math.sin(frameCount * .12 + y) * 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+        }
+        const ix = cx - camera.x;
+        const iy = 740 - camera.y;
+        if (iy > -100 && iy < canvas.height + 100) {
+          ctx.fillStyle = '#83654a';
+          ctx.beginPath();
+          ctx.ellipse(ix, iy, 64, 28, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillRect(ix - 46, iy - 44, 92, 45);
+          ctx.strokeStyle = 'rgba(230,230,220,.38)';
+          ctx.lineWidth = 5;
+          for (let i = -1; i <= 1; i++) {
+            ctx.beginPath();
+            ctx.moveTo(ix + i * 22, iy - 48);
+            ctx.quadraticCurveTo(ix + i * 22 + 18, iy - 82, ix + i * 22 - 5, iy - 116);
+            ctx.stroke();
+          }
+        }
+        return;
+      }
+
       if (currentMap === 'kuhai') {
         // 风雪尽头的巨龟岛，作为苦海的远景地标。
         const tx = WORLD.w / 2 - camera.x;
@@ -4954,6 +5274,181 @@
       ctx.strokeRect(bx, by, barWidth, 8);
     }
 
+    // 小雷音寺四护法：共用僧人轮廓，以体型、法器和僧袍区分。
+    function drawLeiyinMonk(e, sx, sy) {
+      const styles = {
+        buneng: { robe: '#8b4a24', dark: '#4d2618', trim: '#d5a64b', skin: '#b98358', mark: '力', weapon: 'fists' },
+        bubai: { robe: '#d7d9d6', dark: '#777d7d', trim: '#b93b36', skin: '#d7b394', mark: '刃', weapon: 'blades' },
+        bujing: { robe: '#55634b', dark: '#273127', trim: '#b8964e', skin: '#9d765c', mark: '戒', weapon: 'staff' },
+        bukong: { robe: '#4d416e', dark: '#241d39', trim: '#d1b360', skin: '#c6a287', mark: '空', weapon: 'beads' }
+      };
+      const s = styles[e.type] || styles.buneng;
+      const u = e.radius * 1.15;
+      const broad = e.type === 'buneng' ? 1.18 : e.type === 'bujing' ? 1.08 : .96;
+      const bob = Math.sin(frameCount * .075 + e.bob) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.45, u * 2.05);
+
+      if (e.type === 'bukong') {
+        ctx.strokeStyle = 'rgba(171,139,235,.35)';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 3; i++) {
+          const a = frameCount * .045 + i * Math.PI * 2 / 3;
+          ctx.beginPath();
+          ctx.arc(0, -u * 1.55, u * 1.45, a, a + .9);
+          ctx.stroke();
+        }
+      }
+
+      ctx.fillStyle = 'rgba(0,0,0,.27)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.15 * broad, u * .3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 绑腿与僧鞋。
+      ctx.fillStyle = s.dark;
+      ctx.beginPath();
+      ctx.ellipse(-u * .35, -u * .35, u * .25, u * .42, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * .35, -u * .35, u * .25, u * .42, 0, 0, Math.PI * 2);
+      ctx.ellipse(-u * .4, -u * .03, u * .34, u * .13, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * .4, -u * .03, u * .34, u * .13, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 僧袍与腰带。
+      const robe = ctx.createLinearGradient(-u, 0, u, 0);
+      robe.addColorStop(0, s.dark);
+      robe.addColorStop(.48, s.robe);
+      robe.addColorStop(1, s.dark);
+      ctx.fillStyle = robe;
+      ctx.beginPath();
+      ctx.moveTo(-u * .65 * broad, -u * 2.08);
+      ctx.quadraticCurveTo(-u * 1.02 * broad, -u * 1.15, -u * .82 * broad, -u * .12);
+      ctx.lineTo(u * .82 * broad, -u * .12);
+      ctx.quadraticCurveTo(u * 1.02 * broad, -u * 1.15, u * .65 * broad, -u * 2.08);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = s.trim;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(-u * .72 * broad, -u * .55);
+      ctx.lineTo(u * .72 * broad, -u * .55);
+      ctx.moveTo(-u * .5, -u * 2);
+      ctx.lineTo(u * .42, -u * .62);
+      ctx.stroke();
+
+      // 双臂与手部。
+      ctx.fillStyle = s.robe;
+      ctx.beginPath();
+      ctx.ellipse(-u * .82 * broad, -u * 1.45, u * .25 * broad, u * .62, .28, 0, Math.PI * 2);
+      ctx.ellipse(u * .82 * broad, -u * 1.45, u * .25 * broad, u * .62, -.28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = s.skin;
+      ctx.beginPath();
+      ctx.arc(-u * .96 * broad, -u * .92, u * (e.type === 'buneng' ? .26 : .16), 0, Math.PI * 2);
+      ctx.arc(u * .96 * broad, -u * .92, u * (e.type === 'buneng' ? .26 : .16), 0, Math.PI * 2);
+      ctx.fill();
+
+      if (s.weapon === 'blades') {
+        ctx.strokeStyle = '#cfd8dc';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-u * .98, -u * .88);
+        ctx.lineTo(-u * 1.55, -u * 2.85);
+        ctx.moveTo(u * .98, -u * .88);
+        ctx.lineTo(u * 1.55, -u * 2.85);
+        ctx.stroke();
+        ctx.strokeStyle = '#7f1f1c';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(-u * .86, -u * .78);
+        ctx.lineTo(-u * 1.05, -u * 1.38);
+        ctx.moveTo(u * .86, -u * .78);
+        ctx.lineTo(u * 1.05, -u * 1.38);
+        ctx.stroke();
+      } else if (s.weapon === 'staff') {
+        ctx.strokeStyle = '#5a4631';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(u * 1.1, 0);
+        ctx.lineTo(u * 1.25, -u * 3.15);
+        ctx.stroke();
+        ctx.strokeStyle = '#bfa257';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(u * 1.25, -u * 3.18, u * .28, -.8, Math.PI + .8);
+        ctx.stroke();
+      } else if (s.weapon === 'beads') {
+        ctx.fillStyle = '#bb8c3e';
+        for (let i = 0; i < 12; i++) {
+          const a = i / 12 * Math.PI * 2;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * u * .68, -u * 1.5 + Math.sin(a) * u * .74, u * .09, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        // 不能的缠布重拳。
+        ctx.strokeStyle = '#e0c08b';
+        ctx.lineWidth = 3;
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.arc(side * u * 1.12 * broad, -u * .9, u * .3, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(side * u * .94 * broad, -u * 1.02);
+          ctx.lineTo(side * u * 1.28 * broad, -u * .78);
+          ctx.stroke();
+        }
+      }
+
+      // 光头、护额与法号印记。
+      ctx.fillStyle = s.skin;
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.55, u * .52, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = s.dark;
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.6, u * .48, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.stroke();
+      ctx.fillStyle = '#281a15';
+      ctx.beginPath();
+      ctx.ellipse(-u * .19, -u * 2.58, u * .085, u * .045, 0, 0, Math.PI * 2);
+      ctx.ellipse(u * .19, -u * 2.58, u * .085, u * .045, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = s.trim;
+      ctx.font = `bold ${u * .29}px serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(s.mark, 0, -u * 2.75);
+      ctx.textAlign = 'left';
+
+      if (e.flash > 0) {
+        ctx.globalAlpha = e.flash / 6 * .5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.45, u * 1.25 * broad, u * 1.85, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+
+      const barWidth = u * 2.7;
+      const bx = sx - barWidth / 2;
+      const by = sy - u * 3.72;
+      ctx.fillStyle = 'rgba(0,0,0,.62)';
+      ctx.fillRect(bx - 2, by - 2, barWidth + 4, 12);
+      ctx.fillStyle = '#29343a';
+      ctx.fillRect(bx, by, barWidth, 8);
+      ctx.fillStyle = '#c43c36';
+      ctx.fillRect(bx, by, barWidth * Math.max(0, e.hp / e.maxHp), 8);
+      ctx.strokeStyle = '#f4e8ca';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barWidth, 8);
+    }
+
     const ATTACK_LABELS = {
       melee: '挥击',
       lunge: '突进',
@@ -5186,6 +5681,7 @@
         else if (e.type === 'shaguo') drawShaguo(e, 0, 0);
         else if (e.type === 'shixian') drawShixian(e, 0, 0);
         else if (e.type === 'huxian') drawHuxian(e, 0, 0);
+        else if (['buneng', 'bubai', 'bujing', 'bukong'].includes(e.type)) drawLeiyinMonk(e, 0, 0);
         else drawBossBear(e, 0, 0);
       }
       else if (e.type === 'wolf') drawWolfChar(e, 0, 0);
@@ -5820,6 +6316,15 @@
         overlay.style.display = 'none';
         enterKuhai();
         banner = { text: '于苦海北岸存档点复活', timer: 140 };
+        gameRunning = true;
+        lastFrameTime = 0; frameAccumulator = 0;
+        gameLoop();
+        return;
+      }
+      if (checkpoint && checkpoint.map === 'leiyin' && currentMap === 'leiyin') {
+        overlay.style.display = 'none';
+        setupLeiyin(checkpoint.bossIndex ?? progress.leiyinBossIndex ?? 0);
+        banner = { text: '于小雷音寺存档点复活', timer: 140 };
         gameRunning = true;
         lastFrameTime = 0; frameAccumulator = 0;
         gameLoop();
