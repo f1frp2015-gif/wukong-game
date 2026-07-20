@@ -500,6 +500,7 @@
     const SAVE_KEY = 'haWukongProgressV3';
     const DEFAULT_PROGRESS = {
       spirit: 0, cultivation: 0, chapterUnlocked: 1, chapter2Checkpoint: 0,
+      chapter3Checkpoint: 'intro', reachedKuhai: false,
       unlockedStances: ['chop'], unlockedSkills: ['freeze'], unlockedRelics: [],
       talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false
     };
@@ -508,13 +509,19 @@
       try {
         const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}');
         const list = value => Array.isArray(value) ? value : [];
+        const bossRewards = [...new Set(list(raw.bossRewards))];
+        // 旧版曾把妙音误当作第三章终点，为这批存档直接续上苦海。
+        const reachedKuhai = Boolean(raw.reachedKuhai || bossRewards.includes('miaoyin'));
         return {
           ...DEFAULT_PROGRESS, ...raw,
+          reachedKuhai,
+          chapter3Checkpoint: raw.chapter3Checkpoint || (reachedKuhai ? 'kuhai' : 'intro'),
+          completedChapter3: raw.reachedKuhai ? Boolean(raw.completedChapter3) : false,
           talents: { ...DEFAULT_PROGRESS.talents, ...(raw.talents || {}) },
           unlockedStances: [...new Set(['chop', ...list(raw.unlockedStances)])],
           unlockedSkills: [...new Set(['freeze', ...list(raw.unlockedSkills)])],
           unlockedRelics: [...new Set(list(raw.unlockedRelics))],
-          bossRewards: [...new Set(list(raw.bossRewards))]
+          bossRewards
         };
       } catch {
         return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze'], unlockedRelics: [], bossRewards: [] };
@@ -538,6 +545,8 @@
       document.getElementById('chapter3-button').disabled = progress.chapterUnlocked < 3;
       document.getElementById('save-summary').textContent = progress.completedChapter3
         ? '第三章已通关 · 可继续完善流派与重玩章节'
+        : progress.reachedKuhai
+          ? '第三章进行中 · 已抵达苦海北岸'
         : `最高章节：第${progress.chapterUnlocked}章 · 已投入修行点：${Object.values(progress.talents).reduce((a,b) => a+b, 0)}`;
     }
 
@@ -613,7 +622,8 @@
         checkpoint = { map: 'huangfeng', bossIndex: progress.chapter2Checkpoint || 0 };
         setupHuangfeng(checkpoint.bossIndex); banner = { text: '第二章 · 黄风岭', timer: 180 };
       } else if (chapter === 3) {
-        startChapter3Intro();
+        if (progress.chapter3Checkpoint === 'kuhai' || progress.reachedKuhai) enterKuhai();
+        else startChapter3Intro();
       }
     }
 
@@ -763,8 +773,10 @@
     let icelakePhase = null;
     let icelakeTimer = 0;
     let huangmei = null;
-    let ch3EndCountdown = 0;
     let futuCountdown = 0;
+    let kuhaiCountdown = 0;
+    let kuhaiPhase = null;
+    let kuhaiTimer = 0;
     let score = 0;
     let kills = 0;
     let bossActive = false;
@@ -1012,11 +1024,11 @@
       if (sahaliCountdown > 0 && --sahaliCountdown === 0) enterSahali();
       if (pearlCountdown > 0 && --pearlCountdown === 0) exitSahali();
       if (introCountdown > 0 && --introCountdown === 0) startChapter3Intro();
-      if (ch3EndCountdown > 0 && --ch3EndCountdown === 0) endChapter3();
       if (futuCountdown > 0 && --futuCountdown === 0) enterFutu();
+      if (kuhaiCountdown > 0 && --kuhaiCountdown === 0) enterKuhai();
     }
 
-    // 浮屠界：魔将妙音镇守的终极战场。
+    // 浮屠界：魔将妙音镇守的高塔战场。
     function spawnMiaoyin() {
       enemies.push({
         type: 'miaoyin',
@@ -1150,12 +1162,43 @@
       updateUI();
     }
 
-    function endChapter3() {
-      gameRunning = false;
-      overlayTitle.textContent = '第三章 · 功德圆满';
-      overlayTitle.style.color = '#ffd700';
-      overlayMsg.textContent = `你击败了魔将·妙音，第三章完！敬请期待后续。最终得分: ${score}`;
-      overlay.style.display = 'block';
+    // 击败魔将妙音后抵达苦海北岸，第三章在此继续。
+    function enterKuhai() {
+      setObjective('第三章 · 苦海北岸：沿着冰封海岸向龟岛前行');
+      currentMap = 'kuhai';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      ally = null;
+      huangmei = null;
+      bossActive = false;
+      bossHpEl.style.display = 'none';
+      checkpoint = { map: 'kuhai' };
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 260;
+      refillResources();
+      kuhaiPhase = 'arrive';
+      kuhaiTimer = 210;
+      progress.reachedKuhai = true;
+      progress.chapter3Checkpoint = 'kuhai';
+      persistProgress();
+      for (let i = 0; i < 4; i++) {
+        peaches.push({
+          x: randomRange(360, WORLD.w - 360),
+          y: randomRange(620, WORLD.h - 300),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      banner = { text: '苦海 · 北岸', timer: 190 };
+      updateUI();
+    }
+
+    function updateKuhai() {
+      if (currentMap !== 'kuhai' || kuhaiPhase !== 'arrive') return;
+      if (--kuhaiTimer <= 0) {
+        kuhaiPhase = 'explore';
+        banner = { text: '苦海无涯，龟岛就在风雪尽头……', timer: 180 };
+      }
     }
 
     function spawnKangjinlong() {
@@ -1615,8 +1658,10 @@
       icelakePhase = null;
       icelakeTimer = 0;
       huangmei = null;
-      ch3EndCountdown = 0;
       futuCountdown = 0;
+      kuhaiCountdown = 0;
+      kuhaiPhase = null;
+      kuhaiTimer = 0;
       document.getElementById('slot-sober').style.display = 'none';
       player.hasMantle = false;
       applyPersistentState();
@@ -1801,12 +1846,11 @@
             return false;
           }
           if (e.name === '魔将妙音') {
-            // 第三章最终 BOSS 已灭。
+            // 妙音是第三章的中途守将，击败后前往苦海。
             grantBossReward('miaoyin', 360);
-            progress.completedChapter3 = true;
             persistProgress();
-            banner = { text: '魔将妙音已灭！', timer: 150 };
-            ch3EndCountdown = 190;
+            banner = { text: '魔将妙音已灭！浮屠界尽头通往苦海……', timer: 190 };
+            kuhaiCountdown = 220;
             updateUI();
             return false;
           }
@@ -2343,6 +2387,61 @@
     // ---------- 绘制 ----------
 
     function drawGround() {
+      if (currentMap === 'kuhai') {
+        // 苦海北岸：下方是积雪海岸，上方是被寒雾吞没的幽蓝海面。
+        const shoreY = 1450 - camera.y;
+        const snow = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        snow.addColorStop(0, '#b9cad2');
+        snow.addColorStop(1, '#e4ebed');
+        ctx.fillStyle = snow;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const sea = ctx.createLinearGradient(0, 0, 0, Math.max(1, shoreY));
+        sea.addColorStop(0, '#243f4b');
+        sea.addColorStop(0.55, '#426775');
+        sea.addColorStop(1, '#78939c');
+        ctx.fillStyle = sea;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(canvas.width, 0);
+        for (let x = canvas.width; x >= 0; x -= 36) {
+          const wx = x + camera.x;
+          const wave = Math.sin(wx * .012) * 18 + Math.sin(wx * .027) * 8;
+          ctx.lineTo(x, shoreY + wave);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // 浮冰与暗流纹理。
+        for (let i = 0; i < 95; i++) {
+          const gx = seeded(i + 15100) * WORLD.w;
+          const gy = seeded(i + 15500) * 1380;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -90 || sy < -60 || sx > canvas.width + 90 || sy > canvas.height + 60) continue;
+          ctx.strokeStyle = seeded(i + 15900) > .48 ? 'rgba(205,232,237,.28)' : 'rgba(18,52,64,.25)';
+          ctx.lineWidth = 1.5 + seeded(i + 16000) * 2;
+          ctx.beginPath();
+          ctx.moveTo(sx - 24, sy + 5);
+          ctx.quadraticCurveTo(sx, sy - 8, sx + 34 + seeded(i) * 38, sy + 3);
+          ctx.stroke();
+        }
+
+        // 风雪横向掠过，与冰湖区分出更冷峻的氛围。
+        ctx.strokeStyle = 'rgba(238,247,250,.42)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 22; i++) {
+          const sx = ((seeded(i + 16400) * (canvas.width + 300) + frameCount * 3.8) % (canvas.width + 300)) - 150;
+          const sy = seeded(i + 16800) * canvas.height;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + 25 + seeded(i) * 35, sy - 7);
+          ctx.stroke();
+        }
+        return;
+      }
+
       if (currentMap === 'futu') {
         // 浮屠界：暗色塔底石地，岩浆裂缝泛红。
         ctx.fillStyle = '#241f2a';
@@ -2618,6 +2717,94 @@
     }
 
     function drawDecor() {
+      if (currentMap === 'kuhai') {
+        // 风雪尽头的巨龟岛，作为苦海的远景地标。
+        const tx = WORLD.w / 2 - camera.x;
+        const ty = 250 - camera.y;
+        if (ty > -320 && ty < canvas.height + 180) {
+          ctx.fillStyle = 'rgba(8,25,31,.34)';
+          ctx.beginPath();
+          ctx.ellipse(tx, ty + 48, 310, 78, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#52686c';
+          ctx.beginPath();
+          ctx.ellipse(tx, ty, 255, 118, 0, Math.PI, Math.PI * 2);
+          ctx.lineTo(tx + 255, ty + 20);
+          ctx.quadraticCurveTo(tx, ty + 66, tx - 255, ty + 20);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(25,43,45,.55)';
+          ctx.lineWidth = 5;
+          for (let i = -3; i <= 3; i++) {
+            ctx.beginPath();
+            ctx.arc(tx + i * 58, ty - 2, 44, Math.PI * 1.05, Math.PI * 1.92);
+            ctx.stroke();
+          }
+          ctx.fillStyle = '#60777a';
+          ctx.beginPath();
+          ctx.ellipse(tx, ty + 34, 82, 46, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#d4e1df';
+          ctx.beginPath();
+          ctx.arc(tx - 24, ty + 22, 5, 0, Math.PI * 2);
+          ctx.arc(tx + 24, ty + 22, 5, 0, Math.PI * 2);
+          ctx.fill();
+          // 龟背上覆雪的山峰。
+          ctx.fillStyle = '#738489';
+          for (let i = -2; i <= 2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(tx + i * 88 - 70, ty - 50);
+            ctx.lineTo(tx + i * 88, ty - 155 - Math.abs(i) * 18);
+            ctx.lineTo(tx + i * 88 + 70, ty - 48);
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.fillStyle = 'rgba(238,245,245,.82)';
+          ctx.beginPath();
+          ctx.ellipse(tx, ty - 69, 226, 36, 0, Math.PI, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 北岸的覆雪黑石和废旧经幡。
+        for (let i = 0; i < 28; i++) {
+          const gx = 180 + seeded(i + 17200) * (WORLD.w - 360);
+          const gy = 1180 + seeded(i + 17600) * (WORLD.h - 1260);
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -60 || sy < -80 || sx > canvas.width + 60 || sy > canvas.height + 60) continue;
+          const size = .65 + seeded(i + 18000) * .85;
+          ctx.fillStyle = '#59676a';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 24 * size, 15 * size, seeded(i) * 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(236,244,245,.78)';
+          ctx.beginPath();
+          ctx.ellipse(sx - 4 * size, sy - 8 * size, 16 * size, 6 * size, seeded(i) * 2, Math.PI, Math.PI * 2);
+          ctx.fill();
+        }
+        const flags = [[760, 1370], [1640, 1310], [980, 720], [1420, 650]];
+        for (const [fx, fy] of flags) {
+          const sx = fx - camera.x;
+          const sy = fy - camera.y;
+          if (sx < -80 || sy < -150 || sx > canvas.width + 80 || sy > canvas.height + 80) continue;
+          ctx.strokeStyle = '#403b37';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx, sy - 92);
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(117,52,47,.82)';
+          const flap = Math.sin(frameCount * .12 + fx) * 7;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - 88);
+          ctx.quadraticCurveTo(sx + 29, sy - 81 + flap, sx + 48, sy - 70);
+          ctx.lineTo(sx, sy - 58);
+          ctx.closePath();
+          ctx.fill();
+        }
+        return;
+      }
+
       if (currentMap === 'futu') {
         // 浮屠界：暗红塔柱与幽暗灯笼。
         const pillars = [];
@@ -5371,7 +5558,7 @@
       while (!modalOpen && frameAccumulator >= FIXED_STEP) {
         frameCount++;
         updatePlayer(); updateStaff(); updateSkills(); updateEnemies(); updatePeaches();
-        updateBells(); updateAlly(); updatePigNpc(); updateIntro(); updateIcelake();
+        updateBells(); updateAlly(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai();
         updateProjectiles(); updateParticles(); updateSlashes(); updateDamageTexts();
         frameAccumulator -= FIXED_STEP;
       }
@@ -5410,6 +5597,15 @@
         overlay.style.display = 'none';
         enterFutu();
         banner = { text: '于浮屠界存档点复活', timer: 140 };
+        gameRunning = true;
+        lastFrameTime = 0; frameAccumulator = 0;
+        gameLoop();
+        return;
+      }
+      if (checkpoint && checkpoint.map === 'kuhai' && currentMap === 'kuhai') {
+        overlay.style.display = 'none';
+        enterKuhai();
+        banner = { text: '于苦海北岸存档点复活', timer: 140 };
         gameRunning = true;
         lastFrameTime = 0; frameAccumulator = 0;
         gameLoop();
