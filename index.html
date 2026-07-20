@@ -371,7 +371,7 @@
 <body>
   <h1>哈悟空</h1>
   <div id="info">
-    WASD 移动探索，空格长按蓄力、松开挥棒（越久伤害越高），J / 点击快速挥棒，Shift 闪避<br/>
+    WASD 移动探索，空格长按蓄力、松开重击（越久伤害越高），连续点按 J / 点击使出五段轻棍，Shift 闪避<br/>
     Q 切换已解锁棍式 · 1—4 法术与变化 · 5—6 法宝 · T 土地庙悟道
   </div>
   <div id="score-board">得分: 0 | 击杀: 0</div>
@@ -615,7 +615,9 @@
       swinging: false,
       timer: 0,
       duration: 14,
-      cooldown: 0
+      cooldown: 0,
+      queued: false,
+      attack: null
     };
 
     // 棍式：劈棍过顶劈落、立棍拄棍砸落点、戳棍拧身疾刺。
@@ -626,7 +628,15 @@
     ];
     let stanceIdx = 0;
     const stanceNameEl = document.getElementById('stance-name');
-    const combo = { count: 0, timer: 0, window: 100 };
+    // 轻棍五段：每段改变动作、判定、节奏与突进距离；第五段以跳劈收尾。
+    const LIGHT_COMBO = [
+      { name: '劈棍', kind: 'chop', dmg: .75, range: 115, arc: .85, duration: 12, cd: 9, step: 10 },
+      { name: '横扫', kind: 'chop', dmg: .82, range: 132, arc: 1.25, duration: 13, cd: 10, step: 8 },
+      { name: '疾刺', kind: 'thrust', dmg: .92, range: 165, width: 42, duration: 12, cd: 9, step: 14 },
+      { name: '回旋扫棍', kind: 'chop', dmg: 1.05, range: 148, arc: 1.75, duration: 15, cd: 11, step: 12 },
+      { name: '腾空跳劈', kind: 'vault', dmg: 1.45, range: 112, radius: 108, duration: 18, cd: 24, step: 18 }
+    ];
+    const combo = { count: 0, timer: 0, window: 72 };
     const dodge = { active: false, timer: 0, duration: 10, dx: 0, dy: 0, cooldown: 0, maxCooldown: 42 };
     // 蓄力：空格长按，松开释放，最高 3 倍伤害。
     const charge = { charging: false, level: 0, max: 90 };
@@ -1473,8 +1483,11 @@
       player.empowered = false;
       staff.swinging = false;
       staff.timer = 0;
+      staff.duration = 14;
       staff.cooldown = 0;
       staff.power = 1;
+      staff.queued = false;
+      staff.attack = null;
       charge.charging = false;
       charge.level = 0;
       for (const k in skills) skills[k].cd = 0;
@@ -1561,43 +1574,61 @@
     }
 
     function startSwing(power = 1) {
-      if (staff.swinging || staff.cooldown > 0 || !gameRunning || modalOpen) return;
+      if (!gameRunning || modalOpen) return;
+      const isLight = power <= 1.05;
+      // 在上一段收招前点按会缓存下一段，避免快速输入丢失。
+      if (staff.swinging || staff.cooldown > 0) {
+        if (isLight) staff.queued = true;
+        return;
+      }
       const st = STANCES[stanceIdx];
+      let attack;
+      if (isLight) {
+        const stage = combo.timer > 0 ? combo.count % LIGHT_COMBO.length : 0;
+        attack = { ...LIGHT_COMBO[stage], light: true, stage: stage + 1 };
+        combo.count = stage + 1;
+        combo.timer = combo.window;
+      } else {
+        attack = { ...st, light: false, stage: 0, duration: 14 };
+        combo.count = 0;
+        combo.timer = 0;
+      }
+      staff.attack = attack;
       staff.swinging = true;
-      staff.timer = staff.duration;
-      staff.cooldown = st.cd;
+      staff.duration = attack.duration;
+      staff.timer = attack.duration;
+      staff.cooldown = attack.cd;
       staff.power = power * (transform.active ? transform.dmgMult : 1);
-      // 连击：时间窗内连续挥棒提升段数，最高三段。
-      combo.count = combo.timer > 0 ? Math.min(combo.count + 1, 3) : 1;
-      combo.timer = combo.window;
       const slash = {
-        kind: st.kind,
+        kind: attack.kind,
         x: player.x,
         y: player.y,
         angle: player.angle,
-        arc: st.arc,
-        range: st.range,
-        radius: st.radius,
+        arc: attack.arc,
+        range: attack.range,
+        radius: attack.radius,
+        comboStage: attack.stage,
         power,
         fire: transform.active,
         life: 1
       };
-      if (st.kind === 'vault') {
-        slash.tx = player.x + Math.cos(player.angle) * st.range;
-        slash.ty = player.y + Math.sin(player.angle) * st.range;
+      if (attack.kind === 'vault') {
+        slash.tx = player.x + Math.cos(player.angle) * attack.range;
+        slash.ty = player.y + Math.sin(player.angle) * attack.range;
       }
       slashes.push(slash);
     }
 
     function updateStaff() {
       if (staff.cooldown > 0) staff.cooldown--;
-      if (!staff.swinging) return;
-      staff.timer--;
-      if (staff.timer === staff.duration - 4) {
-        checkAttackHits();
+      if (staff.swinging) {
+        staff.timer--;
+        if (staff.timer === staff.duration - 4) checkAttackHits();
+        if (staff.timer <= 0) staff.swinging = false;
       }
-      if (staff.timer <= 0) {
-        staff.swinging = false;
+      if (!staff.swinging && staff.queued && staff.cooldown <= 0) {
+        staff.queued = false;
+        startSwing(1);
       }
     }
 
@@ -1721,11 +1752,16 @@
     }
 
     function checkAttackHits() {
-      const st = STANCES[stanceIdx];
-      const comboMult = 1 + (combo.count - 1) * (progress.talents.staff >= 2 ? .5 : .35);
+      const st = staff.attack || STANCES[stanceIdx];
       const power = (player.empowered ? (progress.talents.body >= 3 ? 2.5 : 2) : 1) * staff.power;
       player.empowered = false;
-      const mult = st.dmg * comboMult * power * (1 + progress.talents.staff * .12);
+      const lightTalentBonus = st.light && progress.talents.staff >= 2 ? 1 + (st.stage - 1) * .08 : 1;
+      const mult = st.dmg * lightTalentBonus * power * (1 + progress.talents.staff * .12);
+
+      if (st.light && st.step) {
+        player.x = clamp(player.x + Math.cos(player.angle) * st.step, player.r, WORLD.w - player.r);
+        player.y = clamp(player.y + Math.sin(player.angle) * st.step, player.r, WORLD.h - player.r);
+      }
 
       if (st.kind === 'vault') {
         // 立棍：砸向面前落点的范围伤害。
@@ -4778,13 +4814,14 @@
         ctx.stroke();
       }
 
-      // 三种棍式各有架势。
-      const st = STANCES[stanceIdx];
+      // 轻棍连招跟随当前段式变化；待机与重击保持当前棍式架势。
+      const st = staff.swinging && staff.attack ? staff.attack : STANCES[stanceIdx];
       const swingP = staff.swinging ? 1 - staff.timer / staff.duration : 0;
       let rel;
       let lenVis;
       if (st.kind === 'chop') {
-        rel = staff.swinging ? -1.6 + swingP * 2.1 : -0.6;
+        const reverse = st.light && (st.stage === 2 || st.stage === 4);
+        rel = staff.swinging ? (reverse ? 1.35 - swingP * 2.2 : -1.6 + swingP * 2.1) : -0.6;
         lenVis = st.range * 0.82;
       } else if (st.kind === 'vault') {
         rel = 0;
@@ -5173,13 +5210,13 @@
     }
 
     function drawCombo() {
-      if (combo.count < 2 || combo.timer <= 0) return;
+      if (combo.count < 1 || combo.timer <= 0 || !staff.attack?.light) return;
       ctx.fillStyle = '#ffd700';
       ctx.font = 'bold 26px sans-serif';
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 4;
-      const text = `连击 x${combo.count}`;
+      const text = `轻棍 ${combo.count}/5 · ${staff.attack.name}`;
       ctx.strokeText(text, canvas.width / 2, 46);
       ctx.fillText(text, canvas.width / 2, 46);
       ctx.textAlign = 'left';
@@ -5324,7 +5361,7 @@
         return;
       }
       if (modalOpen) return;
-      if (e.repeat && ['q','Q','1','2','3','4','5','6','Shift'].includes(e.key)) return;
+      if (e.repeat && ['j','J','q','Q','1','2','3','4','5','6','Shift'].includes(e.key)) return;
       if (e.key === ' ') {
         startCharge();
       }
@@ -5427,7 +5464,8 @@
       e.preventDefault();
     }, { passive: false });
     btnAttack.addEventListener('touchend', (e) => {
-      releaseCharge();
+      if (charge.charging) releaseCharge();
+      else startSwing(1);
       e.preventDefault();
     }, { passive: false });
 
