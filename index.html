@@ -207,12 +207,8 @@
 
     .skill.locked { opacity: 0.28; filter: grayscale(1); }
 
-    #progress-hud {
-      position: fixed; top: 18px; right: 76px; z-index: 3;
-      padding: 9px 13px; border: 1px solid rgba(212, 175, 55, 0.65);
-      border-radius: 8px; background: rgba(10, 8, 6, 0.72); color: #ead58b;
-      font-size: 13px; line-height: 1.55; text-align: right; pointer-events: none;
-    }
+    /* 灵蕴/修行点不再常驻显示（土地庙与设置面板内仍可见）。 */
+    #progress-hud { display: none; }
 
     #objective {
       position: fixed; top: 10px; left: 50%; z-index: 3;
@@ -407,7 +403,7 @@
 
     #btn-attack {
       right: 26px;
-      bottom: 26px;
+      bottom: 69px;
       width: 92px;
       height: 92px;
       font-size: 18px;
@@ -416,8 +412,8 @@
     }
 
     #btn-dodge {
-      width: 56px;
-      height: 56px;
+      width: 64px;
+      height: 64px;
       font-size: 13px;
     }
 
@@ -431,12 +427,16 @@
       border-radius: 50%;
       border: 1px solid rgba(212, 175, 55, 0.65);
       background: rgba(10, 8, 6, 0.78);
-      color: #ead58b;
-      font-size: 20px;
-      line-height: 1;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       touch-action: manipulation;
     }
+
+    #settings-btn canvas { position: static; width: 40px; height: 40px; display: block; background: transparent; cursor: inherit; }
 
     /* 小屏压缩 HUD */
     @media (max-height: 500px) {
@@ -451,7 +451,7 @@
       #player-resources { width: 190px; padding: 5px 7px; left: 10px; top: 10px; }
       .resource-row { grid-template-columns: 32px 1fr 56px; gap: 5px; margin: 3px 0; font-size: 10px; }
       body.touch #player-resources { left: 10px; top: 10px; width: 180px; }
-      #btn-attack { width: 76px; height: 76px; right: 18px; bottom: 18px; }
+      #btn-attack { width: 76px; height: 76px; right: 18px; bottom: 77px; }
       #btn-dodge { width: 48px; height: 48px; font-size: 12px; }
       .skill { width: 48px; height: 48px; font-size: 9px; }
     }
@@ -501,7 +501,7 @@
 
   <button class="cbtn" id="btn-dodge">闪避</button>
   <button class="cbtn" id="btn-attack">攻击</button>
-  <button id="settings-btn" title="设置">⚙</button>
+  <button id="settings-btn" title="设置"><canvas id="settings-avatar"></canvas></button>
 
   <section id="settings-panel" class="modal">
     <div class="modal-card">
@@ -1111,7 +1111,8 @@
         }
       }
       const dodgeEl = document.getElementById('btn-dodge');
-      const dodgeSize = btnSize === 48 ? 48 : 56;
+      // 闪避与法术键等直径。
+      const dodgeSize = btnSize;
       dodgeEl.style.left = (cx + radius * Math.cos(Math.PI / 2) - dodgeSize / 2) + 'px';
       dodgeEl.style.top = (cy - radius * Math.sin(Math.PI / 2) - dodgeSize / 2) + 'px';
       const available = STANCES.filter(s => isUnlocked('unlockedStances', s.kind));
@@ -6959,6 +6960,119 @@
       ctx.restore();
     }
 
+    // 卡通猴脸：超夸张大头（头径约为身体两倍），游戏角色与设置头像共用。
+    function drawMonkeyFace(c, cx, hy, hr, u) {
+      c.save();
+      c.lineCap = 'round';
+      // 双耳：外耳 + 内耳。
+      c.fillStyle = '#7a5a3c';
+      c.beginPath();
+      c.arc(cx - hr * 0.92, hy + hr * 0.05, hr * 0.3, 0, Math.PI * 2);
+      c.arc(cx + hr * 0.92, hy + hr * 0.05, hr * 0.3, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#d9a980';
+      c.beginPath();
+      c.arc(cx - hr * 0.92, hy + hr * 0.05, hr * 0.16, 0, Math.PI * 2);
+      c.arc(cx + hr * 0.92, hy + hr * 0.05, hr * 0.16, 0, Math.PI * 2);
+      c.fill();
+      // 头颅毛发：径向渐变，更有体积感。
+      const fur = c.createRadialGradient(cx - hr * 0.3, hy - hr * 0.35, hr * 0.2, cx, hy, hr * 1.06);
+      fur.addColorStop(0, '#a87f56');
+      fur.addColorStop(1, '#755434');
+      c.fillStyle = fur;
+      c.beginPath();
+      c.arc(cx, hy, hr, 0, Math.PI * 2);
+      c.fill();
+      // 头顶三撮呆毛。
+      c.strokeStyle = '#684a2c';
+      c.lineWidth = u * 0.14;
+      c.beginPath();
+      c.moveTo(cx - hr * 0.2, hy - hr * 0.9);
+      c.quadraticCurveTo(cx - hr * 0.32, hy - hr * 1.2, cx - hr * 0.44, hy - hr * 1.24);
+      c.moveTo(cx, hy - hr * 0.98);
+      c.quadraticCurveTo(cx + hr * 0.05, hy - hr * 1.3, cx + hr * 0.16, hy - hr * 1.34);
+      c.moveTo(cx + hr * 0.24, hy - hr * 0.86);
+      c.quadraticCurveTo(cx + hr * 0.38, hy - hr * 1.12, cx + hr * 0.5, hy - hr * 1.14);
+      c.stroke();
+      // 脸部浅肤大椭圆，带柔和渐变。
+      const face = c.createRadialGradient(cx - hr * 0.18, hy + hr * 0.22, hr * 0.1, cx, hy + hr * 0.3, hr * 0.85);
+      face.addColorStop(0, '#f4d6ab');
+      face.addColorStop(1, '#dfb287');
+      c.fillStyle = face;
+      c.beginPath();
+      c.ellipse(cx, hy + hr * 0.28, hr * 0.74, hr * 0.6, 0, 0, Math.PI * 2);
+      c.fill();
+      // 腮红。
+      c.fillStyle = 'rgba(235, 110, 90, 0.26)';
+      c.beginPath();
+      c.ellipse(cx - hr * 0.45, hy + hr * 0.44, hr * 0.15, hr * 0.1, 0, 0, Math.PI * 2);
+      c.ellipse(cx + hr * 0.45, hy + hr * 0.44, hr * 0.15, hr * 0.1, 0, 0, Math.PI * 2);
+      c.fill();
+      // 紧箍：主环 + 高光 + 正面箍牌。
+      c.strokeStyle = '#ffd700';
+      c.lineWidth = u * 0.2;
+      c.beginPath();
+      c.arc(cx, hy - hr * 0.26, hr * 0.92, -Math.PI * 0.8, -Math.PI * 0.2);
+      c.stroke();
+      c.strokeStyle = '#fff3b0';
+      c.lineWidth = u * 0.07;
+      c.beginPath();
+      c.arc(cx, hy - hr * 0.28, hr * 0.92, -Math.PI * 0.72, -Math.PI * 0.28);
+      c.stroke();
+      c.fillStyle = '#e8b93c';
+      c.beginPath();
+      c.arc(cx, hy - hr * 1.16, u * 0.17, 0, Math.PI * 2);
+      c.fill();
+      // 眉毛。
+      c.strokeStyle = '#54401f';
+      c.lineWidth = u * 0.1;
+      c.beginPath();
+      c.moveTo(cx - hr * 0.44, hy + hr * 0.04);
+      c.quadraticCurveTo(cx - hr * 0.3, hy - hr * 0.04, cx - hr * 0.15, hy + hr * 0.02);
+      c.moveTo(cx + hr * 0.44, hy + hr * 0.04);
+      c.quadraticCurveTo(cx + hr * 0.3, hy - hr * 0.04, cx + hr * 0.15, hy + hr * 0.02);
+      c.stroke();
+      // 卡通大眼：眼白、瞳仁、双层高光。
+      for (const s of [-1, 1]) {
+        c.fillStyle = '#fff';
+        c.beginPath();
+        c.ellipse(cx + s * hr * 0.28, hy + hr * 0.2, hr * 0.17, hr * 0.2, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#241608';
+        c.beginPath();
+        c.arc(cx + s * hr * 0.28, hy + hr * 0.22, hr * 0.1, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#fff';
+        c.beginPath();
+        c.arc(cx + s * hr * 0.28 - hr * 0.035, hy + hr * 0.17, hr * 0.04, 0, Math.PI * 2);
+        c.arc(cx + s * hr * 0.28 + hr * 0.04, hy + hr * 0.26, hr * 0.02, 0, Math.PI * 2);
+        c.fill();
+      }
+      // 鼻子与微笑。
+      c.fillStyle = '#b98a62';
+      c.beginPath();
+      c.ellipse(cx, hy + hr * 0.42, hr * 0.06, hr * 0.045, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = '#8a5a34';
+      c.lineWidth = u * 0.09;
+      c.beginPath();
+      c.arc(cx, hy + hr * 0.48, hr * 0.17, Math.PI * 0.15, Math.PI * 0.85);
+      c.stroke();
+      c.restore();
+    }
+
+    // 右上角设置键：画一枚主角大头像。
+    function drawSettingsAvatar() {
+      const cv = document.getElementById('settings-avatar');
+      if (!cv || typeof cv.getContext !== 'function') return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      cv.width = 44 * dpr;
+      cv.height = 44 * dpr;
+      const c = cv.getContext('2d');
+      c.scale(dpr, dpr);
+      drawMonkeyFace(c, 22, 25, 17.5, 8.3);
+    }
+
     function drawPlayer() {
       const sx = player.x - camera.x;
       const sy = player.y - camera.y;
@@ -7206,7 +7320,6 @@
 
         const hipY = -u * 1.6;
         const shoulderY = -u * 2.3;
-        const headY = -u * 3.15;
 
         // 双腿：立棍时屈膝端坐，其余状态按行走节奏迈步。
         ctx.strokeStyle = '#3d3020';
@@ -7340,29 +7453,8 @@
           ctx.restore();
         }
 
-        // 猴头（大头Q版）：猴脸、双耳、金箍、双眼。
-        ctx.fillStyle = '#8a6a48';
-        ctx.beginPath();
-        ctx.arc(0, headY, u * 1.0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(-u * 0.95, headY, u * 0.26, 0, Math.PI * 2);
-        ctx.arc(u * 0.95, headY, u * 0.26, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#d9b48c';
-        ctx.beginPath();
-        ctx.ellipse(0, headY + u * 0.22, u * 0.72, u * 0.52, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#ffd700';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, headY - u * 0.25, u * 0.9, -Math.PI * 0.82, -Math.PI * 0.18);
-        ctx.stroke();
-        ctx.fillStyle = '#1a1208';
-        ctx.beginPath();
-        ctx.arc(-u * 0.3, headY + u * 0.05, u * 0.11, 0, Math.PI * 2);
-        ctx.arc(u * 0.3, headY + u * 0.05, u * 0.11, 0, Math.PI * 2);
-        ctx.fill();
+        // 猴头：超夸张大头（头径约为身体两倍），与设置头像共用画法。
+        drawMonkeyFace(ctx, 0, -u * 4.15, u * 2.1, u);
       }
 
       ctx.restore();
@@ -7371,7 +7463,8 @@
       if (charge.charging) {
         const bw = 54;
         const bx = sx - bw / 2;
-        const by = sy - (pillarCharging ? pillarHeight + r * 3 : r * 3.4);
+        // 大头造型下蓄力条需抬得更高，避免压在头上。
+        const by = sy - (pillarCharging ? pillarHeight + r * 7 : r * 6.8);
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(bx - 2, by - 2, bw + 4, 10);
         ctx.fillStyle = charge.level >= 1 ? '#fff2b0' : '#ffd700';
@@ -7894,6 +7987,7 @@
     });
 
     resizeCanvas();
+    drawSettingsAvatar();
     initGame();
     gameLoop();
   </script>

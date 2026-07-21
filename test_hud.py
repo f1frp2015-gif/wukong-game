@@ -48,6 +48,29 @@ with sync_playwright() as p:
     check("血条半透明且缩小（宽≤230、底色透明）",
           res["width"] <= 235 and "0.42" in res["bg"] and "0.3" in res["border"], str(res))
 
+    # ---- 灵蕴/修行点不再常驻显示 ----
+    ph = page.evaluate("getComputedStyle(document.getElementById('progress-hud')).display")
+    check("灵蕴与修行点显示已取消", ph == "none", ph)
+
+    # ---- 设置键为主角大头像 ----
+    av = page.evaluate("""() => {
+        const cv = document.getElementById('settings-avatar');
+        const r = cv.getBoundingClientRect();
+        const c2 = cv.getContext('2d');
+        const d = c2.getImageData(0, 0, cv.width, cv.height).data;
+        let painted = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i] > 0) painted++;
+        return { painted, left: r.left, top: r.top };
+    }""")
+    check("设置键改为主角大头像", av["painted"] > 200 and av["left"] > 1100 and av["top"] < 40, str(av))
+
+    # ---- 攻击键与移动端摇杆中心同一水平线（距底 115px） ----
+    atk_c = page.evaluate("""() => {
+        const r = document.getElementById('btn-attack').getBoundingClientRect();
+        return Math.round(window.innerHeight - (r.top + r.height / 2));
+    }""")
+    check("攻击键中心与摇杆中心同高", atk_c == 115, str(atk_c))
+
     # ---- 技能键 90° 象限均布 ----
     pos = page.evaluate("""() => {
         const atk = document.getElementById('btn-attack').getBoundingClientRect();
@@ -73,6 +96,11 @@ with sync_playwright() as p:
     }""")
     check("技能键角度 120°~180° 均布", angs == [120, 150, 180], str(pos["slots"]))
     check("闪避键居正上方 90°", dodge_ang == 90, str(dodge_ang))
+    dia = page.evaluate("""() => ({
+        dodge: document.getElementById('btn-dodge').getBoundingClientRect().width,
+        skill: document.getElementById('skill-freeze').getBoundingClientRect().width
+    })""")
+    check("闪避与技能键等直径", dia["dodge"] == 64 and dia["skill"] == 64, str(dia))
     check("技能键半径一致（~150）", all(140 <= r <= 160 for r in radii), str(radii))
 
     # ---- 自适应：缩小窗口后半径变小且位置更新 ----
