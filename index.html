@@ -468,11 +468,6 @@
 </head>
 <body>
   <h1>哈悟空</h1>
-  <div id="info">
-    WASD 移动探索，空格长按蓄力、松开重击（劈棍可走位，立棍/戳棍须站定），连续点按 J / 点击使出五段轻棍，Shift 闪避<br/>
-    Q 切换已解锁棍式 · 1—4 已配置法术 · T 土地庙悟道与配置法术 · P 地图<br/>
-    法术与变化消耗法力，轻重攻击与闪避消耗气力
-  </div>
   <div id="score-board">得分: 0 | 击杀: 0</div>
   <div id="progress-hud">灵蕴 0<br/>修行点 0</div>
   <div id="player-resources" aria-label="角色资源">
@@ -3138,6 +3133,12 @@
         else if (mx < -0.1) player.facing = -1;
       } else {
         player.moving = false;
+      }
+
+      // 鼠标指向决定攻击与棍势朝向（双摇杆式；未移动过鼠标时保持移动朝向）。
+      if (mouse.seen) {
+        player.angle = Math.atan2(mouse.y + camera.y - player.y, mouse.x + camera.x - player.x);
+        player.facing = Math.cos(player.angle) >= 0 ? 1 : -1;
       }
 
       // 闪避冲刺。
@@ -7724,6 +7725,14 @@
 
     canvas.addEventListener('mousedown', () => {
       startSwing(1);
+    });
+
+    // 鼠标位置（屏幕坐标）：攻击跟随指向。
+    const mouse = { x: 0, y: 0, seen: false };
+    window.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+      mouse.seen = true;
     });
 
     // ---------- 移动端触屏 ----------
