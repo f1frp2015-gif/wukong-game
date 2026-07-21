@@ -262,6 +262,35 @@
     .talent-card b { margin-bottom: 8px; color: #ffd86b; font-size: 18px; }
     .talent-card span { color: #d7ccb0; font-size: 13px; line-height: 1.55; }
     .talent-card small { display: block; margin-top: 12px; color: #ad9c70; }
+    .panel-sub { margin: 18px 0 4px; color: #d4af37; font-size: 15px; letter-spacing: 2px; text-align: left; }
+    .talent-card.equipped { border-color: #ffd86b; background: rgba(120, 86, 32, .8); box-shadow: 0 0 14px rgba(255, 216, 107, .25); }
+    .talent-card.equipped b::after { content: ' ✓'; color: #9fe08a; }
+    #equip-grid .talent-card { min-height: 120px; }
+
+    #map-box {
+      position: relative; width: min(640px, 86vw); aspect-ratio: 4 / 3; margin: 12px auto;
+      border: 1px solid rgba(212, 175, 55, .7); border-radius: 10px; overflow: hidden;
+      background: #16240f; cursor: crosshair;
+    }
+    .map-dot { position: absolute; transform: translate(-50%, -100%); text-align: center; pointer-events: none; }
+    .map-dot i {
+      display: block; width: 10px; height: 10px; margin: 0 auto 3px; border-radius: 50%;
+      background: #ffd86b; border: 1px solid #5a4310; box-shadow: 0 0 6px rgba(255, 216, 107, .8);
+    }
+    .map-dot.boss i { background: #ff6a4d; border-color: #6b1d10; box-shadow: 0 0 6px rgba(255, 106, 77, .8); }
+    .map-dot span {
+      font-size: 11px; color: #f5ecd2; text-shadow: 0 1px 2px #000; white-space: nowrap;
+      background: rgba(0, 0, 0, .45); padding: 0 4px; border-radius: 4px;
+    }
+    .map-player {
+      position: absolute; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%);
+      background: #9fe08a; border: 2px solid #fff; box-shadow: 0 0 10px #9fe08a; pointer-events: none;
+      animation: mapPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes mapPulse { 50% { box-shadow: 0 0 18px 5px rgba(159, 224, 138, .7); } }
+    #map-hint { margin: 6px 0 12px; color: #ad9c70; font-size: 13px; }
+    #map-travel { margin-bottom: 14px; }
+    #map-travel button[disabled] { opacity: .35; cursor: not-allowed; }
 
     canvas {
       position: fixed;
@@ -441,7 +470,7 @@
   <h1>哈悟空</h1>
   <div id="info">
     WASD 移动探索，空格长按蓄力、松开重击（劈棍可走位，立棍/戳棍须站定），连续点按 J / 点击使出五段轻棍，Shift 闪避<br/>
-    Q 切换已解锁棍式 · 1—8 法术、变化与法宝 · T 土地庙悟道<br/>
+    Q 切换已解锁棍式 · 1—4 已配置法术 · T 土地庙悟道与配置法术 · P 地图<br/>
     法术与变化消耗法力，轻重攻击与闪避消耗气力
   </div>
   <div id="score-board">得分: 0 | 击杀: 0</div>
@@ -493,6 +522,7 @@
       <button class="tbtn" data-act="cloud">隐身</button>
       <button class="tbtn" data-act="pluck">分身</button>
       <button class="tbtn" data-act="talent">悟道</button>
+      <button class="tbtn" data-act="map">地图</button>
       <button class="tbtn" data-act="dodge">闪避</button>
       <button class="tbtn" id="btn-attack">攻击</button>
     </div>
@@ -508,7 +538,7 @@
   <section id="start-menu" class="modal visible">
     <div class="modal-card">
       <h2>哈悟空</h2>
-      <p>从黑风山一路修行至小西天。击败强敌获得修行点，在土地庙形成自己的棍法、法术与身法流派。</p>
+      <p>从黑风山一路修行至小西天。击败强敌获得修行点，在土地庙参悟流派，并自由配置法术（至多 4 个，法宝仅能择一）。</p>
       <div class="menu-actions">
         <button onclick="startChapter(1)">第一章 · 黑风山</button>
         <button id="chapter2-button" onclick="startChapter(2)">第二章 · 黄风岭</button>
@@ -522,9 +552,22 @@
   <section id="talent-panel" class="modal">
     <div class="modal-card">
       <h2>土地庙 · 悟道</h2>
+      <h3 class="panel-sub">法术配置（最多 4 个，定风珠与避火罩仅可择一）</h3>
+      <div id="equip-grid" class="talent-grid"></div>
+      <h3 class="panel-sub">悟道参修</h3>
       <p id="talent-points"></p>
       <div id="talent-grid" class="talent-grid"></div>
       <div class="menu-actions"><button onclick="closeTalentPanel()">返回旅途</button></div>
+    </div>
+  </section>
+
+  <section id="map-panel" class="modal">
+    <div class="modal-card">
+      <h2 id="map-title">地图</h2>
+      <div id="map-box"></div>
+      <p id="map-hint">点击地图任意位置可瞬移过去</p>
+      <div id="map-travel" class="menu-actions"></div>
+      <div class="menu-actions"><button onclick="closeMapPanel()">关闭地图</button></div>
     </div>
   </section>
 
@@ -547,6 +590,11 @@
     const startMenuEl = document.getElementById('start-menu');
     const talentPanelEl = document.getElementById('talent-panel');
     const talentGridEl = document.getElementById('talent-grid');
+    const equipGridEl = document.getElementById('equip-grid');
+    const mapPanelEl = document.getElementById('map-panel');
+    const mapBoxEl = document.getElementById('map-box');
+    const mapTitleEl = document.getElementById('map-title');
+    const mapTravelEl = document.getElementById('map-travel');
     const talentPointsEl = document.getElementById('talent-points');
 
     const SAVE_KEY = 'haWukongProgressV3';
@@ -555,8 +603,37 @@
       chapter3Checkpoint: 'intro', reachedKuhai: false, reachedLeiyin: false,
       leiyinBossIndex: 0, completedLeiyinGuardians: false,
       unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [],
+      equippedSpells: ['freeze', 'cloud', 'pluck'],
       talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false
     };
+
+    // 可在土地庙配置的法术/变化/法宝，技能栏键位 1—4 按此顺序分配。
+    // exclusive 相同的互为排斥：定风珠与避火罩只能择一。
+    const SPELL_DEFS = [
+      { id: 'freeze', name: '定身术', desc: '定住附近的怪物', group: 'unlockedSkills' },
+      { id: 'sweep', name: '横扫六合', desc: '以自身为中心的范围重击', group: 'unlockedSkills' },
+      { id: 'fire', name: '火眼金睛', desc: '金光重创视野内最近的怪物', group: 'unlockedSkills' },
+      { id: 'transform', name: '广智变身', desc: '短时间强化攻击与移速', group: 'unlockedSkills' },
+      { id: 'pearl', name: '定风珠', desc: '定住全场妖怪 10 秒', group: 'unlockedRelics', exclusive: 'relic' },
+      { id: 'mantle', name: '避火罩', desc: '8 秒内减伤 60%', group: 'unlockedRelics', exclusive: 'relic' },
+      { id: 'cloud', name: '聚形散气', desc: '隐去身形，可趁机蓄力', group: 'unlockedSkills' },
+      { id: 'pluck', name: '身外身法', desc: '拔毫成兵，召出分身助战', group: 'unlockedSkills' }
+    ];
+    const MAX_EQUIPPED = 4;
+    const spellDef = id => SPELL_DEFS.find(d => d.id === id);
+
+    // 过滤出已解锁且合法的配置：去重、按规范顺序、消解互斥、至多 MAX_EQUIPPED 个。
+    function normalizeEquipped(equipped, unlockedSkills, unlockedRelics) {
+      const groups = { unlockedSkills, unlockedRelics };
+      const picked = [];
+      for (const def of SPELL_DEFS) {
+        if (picked.length >= MAX_EQUIPPED) break;
+        if (!equipped.includes(def.id) || !groups[def.group].includes(def.id)) continue;
+        if (def.exclusive && picked.some(id => spellDef(id).exclusive === def.exclusive)) continue;
+        picked.push(def.id);
+      }
+      return picked;
+    }
 
     function loadProgress() {
       try {
@@ -568,6 +645,10 @@
         const guardianIds = ['buneng', 'bubai', 'bujing', 'bukong'];
         const defeatedGuardians = guardianIds.filter(id => bossRewards.includes(id)).length;
         const reachedLeiyin = Boolean(raw.reachedLeiyin || defeatedGuardians > 0);
+        const unlockedSkills = [...new Set(['freeze', 'cloud', 'pluck', ...list(raw.unlockedSkills)])];
+        const unlockedRelics = [...new Set(list(raw.unlockedRelics))];
+        // 旧存档没有配置字段时，按规范顺序取前 4 个已解锁法术作为默认配置。
+        const equippedRaw = Array.isArray(raw.equippedSpells) ? raw.equippedSpells : [...unlockedSkills, ...unlockedRelics];
         return {
           ...DEFAULT_PROGRESS, ...raw,
           reachedKuhai,
@@ -578,12 +659,13 @@
           completedChapter3: raw.reachedKuhai ? Boolean(raw.completedChapter3) : false,
           talents: { ...DEFAULT_PROGRESS.talents, ...(raw.talents || {}) },
           unlockedStances: [...new Set(['chop', ...list(raw.unlockedStances)])],
-          unlockedSkills: [...new Set(['freeze', 'cloud', 'pluck', ...list(raw.unlockedSkills)])],
-          unlockedRelics: [...new Set(list(raw.unlockedRelics))],
+          unlockedSkills,
+          unlockedRelics,
+          equippedSpells: normalizeEquipped(equippedRaw, unlockedSkills, unlockedRelics),
           bossRewards
         };
       } catch {
-        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [], bossRewards: [] };
+        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [], equippedSpells: ['freeze', 'cloud', 'pluck'], bossRewards: [] };
       }
     }
 
@@ -635,7 +717,107 @@
       talentReturnToStart = false;
     }
 
+    // 各区域简易地图：地标坐标取自对应生成函数，x/2400、y/1800 换算为百分比放置。
+    const MAP_DEFS = {
+      forest:    { name: '第一章 · 黑风山', color: '#16240f', landmarks: [
+        { name: '入口', x: 1200, y: 1200 }, { name: '黑风大王', x: 1950, y: 400, boss: true } ],
+        note: '撞响三口山钟可开启旧观音禅院' },
+      temple:    { name: '旧观音禅院', color: '#2a1410', landmarks: [
+        { name: '入口', x: 1200, y: 1520 }, { name: '金池长老', x: 1200, y: 560, boss: true } ] },
+      huangfeng: { name: '第二章 · 黄风岭', color: '#2e2410', landmarks: [
+        { name: '入口', x: 1200, y: 1540 }, { name: '沙国王父子', x: 430, y: 470, boss: true },
+        { name: '石先锋', x: 1940, y: 430, boss: true }, { name: '虎先锋', x: 1200, y: 920, boss: true },
+        { name: '黄风大圣', x: 1200, y: 360, boss: true }, { name: '黄袍员外', x: 2220, y: 1000 } ] },
+      sahali:    { name: '斯哈里国', color: '#241a2e', landmarks: [
+        { name: '入口', x: 1200, y: 1520 }, { name: '蝜蝂', x: 1200, y: 460, boss: true } ] },
+      futu:      { name: '第三章 · 浮屠界', color: '#1a2029', landmarks: [
+        { name: '入口', x: 1200, y: 1540 }, { name: '魔将妙音', x: 1200, y: 420, boss: true } ] },
+      intro:     { name: '第三章 · 雪原', color: '#23303a', landmarks: [
+        { name: '雪原入口', x: 1200, y: 1600 }, { name: '小西天土地', x: 1200, y: 240 } ] },
+      icelake:   { name: '第三章 · 冰湖', color: '#1d2c38', landmarks: [
+        { name: '入口', x: 1200, y: 1540 }, { name: '亢金龙', x: 1200, y: 520, boss: true } ] },
+      kuhai:     { name: '第三章 · 苦海北岸', color: '#12282a', landmarks: [
+        { name: '北岸', x: 1200, y: 1540 }, { name: '海岸深处', x: 1200, y: 400 } ] },
+      leiyin:    { name: '第三章 · 小雷音寺', color: '#2b2113', landmarks: [
+        { name: '入口', x: 1200, y: 1500 }, { name: '大殿', x: 1200, y: 500, boss: true } ] },
+      renzhongdai: { name: '人种袋', color: '#3a1518', landmarks: [
+        { name: '袋口', x: 1200, y: 1520 }, { name: '赤尻马猴', x: 1200, y: 520, boss: true } ] }
+    };
+    // 可神行的枢纽区域：解锁条件与重入方式。
+    const TRAVEL_SPOTS = [
+      { map: 'forest', name: '黑风山', unlocked: () => true, go: () => startChapter(1) },
+      { map: 'huangfeng', name: '黄风岭', unlocked: () => progress.chapterUnlocked >= 2, go: () => enterHuangfeng() },
+      { map: 'kuhai', name: '苦海北岸', unlocked: () => progress.reachedKuhai, go: () => enterKuhai() },
+      { map: 'leiyin', name: '小雷音寺', unlocked: () => progress.reachedLeiyin, go: () => setupLeiyin(progress.leiyinBossIndex || 0) }
+    ];
+    // 剧情/隐藏区域不允许神行离开，避免打断剧情脚本。
+    const TRAVEL_FROM_OK = ['forest', 'huangfeng', 'kuhai', 'leiyin'];
+
+    function openMapPanel() {
+      if (!gameRunning || startMenuEl.classList.contains('visible') || talentPanelEl.classList.contains('visible')) return;
+      modalOpen = true;
+      renderMapPanel();
+      mapPanelEl.classList.add('visible');
+    }
+
+    function closeMapPanel() {
+      mapPanelEl.classList.remove('visible');
+      modalOpen = false;
+    }
+
+    function renderMapPanel() {
+      const def = MAP_DEFS[currentMap] || MAP_DEFS.forest;
+      mapTitleEl.textContent = def.name;
+      mapBoxEl.style.background = def.color;
+      mapBoxEl.innerHTML = '';
+      for (const lm of def.landmarks) {
+        const dot = document.createElement('div');
+        dot.className = 'map-dot' + (lm.boss ? ' boss' : '');
+        dot.style.left = (lm.x / WORLD.w * 100) + '%';
+        dot.style.top = (lm.y / WORLD.h * 100) + '%';
+        dot.innerHTML = `<i></i><span>${lm.name}</span>`;
+        mapBoxEl.appendChild(dot);
+      }
+      const me = document.createElement('div');
+      me.className = 'map-player';
+      me.style.left = (player.x / WORLD.w * 100) + '%';
+      me.style.top = (player.y / WORLD.h * 100) + '%';
+      mapBoxEl.appendChild(me);
+      document.getElementById('map-hint').textContent =
+        '点击地图任意位置可瞬移过去' + (def.note ? ` · ${def.note}` : '');
+      // 神行：枢纽区域互传，须已解锁；剧情区域禁用。
+      const canLeave = TRAVEL_FROM_OK.includes(currentMap);
+      mapTravelEl.innerHTML = '';
+      for (const spot of TRAVEL_SPOTS) {
+        const btn = document.createElement('button');
+        btn.textContent = '神行 · ' + spot.name;
+        btn.disabled = !canLeave || !spot.unlocked() || spot.map === currentMap;
+        if (spot.map === currentMap) btn.textContent += '（当前）';
+        else if (!spot.unlocked()) btn.textContent += '（未解锁）';
+        else if (!canLeave) btn.textContent = '神行（剧情区域不可用）';
+        btn.addEventListener('click', () => travelTo(spot));
+        mapTravelEl.appendChild(btn);
+      }
+    }
+
+    function travelTo(spot) {
+      if (!TRAVEL_FROM_OK.includes(currentMap) || !spot.unlocked() || spot.map === currentMap) return;
+      mapPanelEl.classList.remove('visible');
+      modalOpen = false;
+      spot.go();
+    }
+
+    // 点击示意图：按比例换算世界坐标并瞬移（边缘留余量）。
+    mapBoxEl.addEventListener('click', (e) => {
+      const rect = mapBoxEl.getBoundingClientRect();
+      const m = 60;
+      player.x = Math.max(m, Math.min(WORLD.w - m, (e.clientX - rect.left) / rect.width * WORLD.w));
+      player.y = Math.max(m, Math.min(WORLD.h - m, (e.clientY - rect.top) / rect.height * WORLD.h));
+      closeMapPanel();
+    });
+
     function renderTalentPanel() {
+      renderEquipGrid();
       talentPointsEl.textContent = `灵蕴 ${progress.spirit} · 修行点 ${progress.cultivation}。每次参悟消耗1修行点。`;
       talentGridEl.innerHTML = '';
       for (const [key, talent] of Object.entries(TALENTS)) {
@@ -650,6 +832,36 @@
       }
     }
 
+    function renderEquipGrid() {
+      equipGridEl.innerHTML = '';
+      for (const def of SPELL_DEFS) {
+        const unlocked = isUnlocked(def.group, def.id);
+        const equipped = isEquipped(def.id);
+        const slot = equipped ? SPELL_DEFS.filter(d => isEquipped(d.id)).findIndex(d => d.id === def.id) : -1;
+        const card = document.createElement('button');
+        card.className = 'talent-card' + (equipped ? ' equipped' : '');
+        card.disabled = !unlocked;
+        card.innerHTML = `<b>${def.name}</b><span>${def.desc}${def.exclusive ? '（与另一样法宝互斥）' : ''}</span><small>${!unlocked ? '未解锁' : equipped ? `已配置 · 键位 ${slot + 1}` : progress.equippedSpells.length >= MAX_EQUIPPED ? '配置已满（先取消一个）' : '点击配置'}</small>`;
+        card.addEventListener('click', () => toggleEquip(def.id));
+        equipGridEl.appendChild(card);
+      }
+    }
+
+    function toggleEquip(id) {
+      const def = spellDef(id);
+      if (!def || !isUnlocked(def.group, id)) return;
+      const idx = progress.equippedSpells.indexOf(id);
+      if (idx >= 0) {
+        progress.equippedSpells.splice(idx, 1);
+      } else {
+        // 定风珠与避火罩互斥：配置其一时自动取消另一个（即使已满 4 个也可替换）。
+        if (def.exclusive) progress.equippedSpells = progress.equippedSpells.filter(x => spellDef(x).exclusive !== def.exclusive);
+        if (progress.equippedSpells.length >= MAX_EQUIPPED) return;
+        progress.equippedSpells.push(id);
+      }
+      persistProgress(); updateUnlockUI(); renderTalentPanel();
+    }
+
     function spendTalent(key) {
       const rank = progress.talents[key], cost = talentCost(rank);
       if (rank >= 3 || progress.cultivation < 1 || progress.spirit < cost) return;
@@ -659,9 +871,18 @@
 
     function isUnlocked(group, key) { return progress[group].includes(key); }
 
+    function isEquipped(id) { return progress.equippedSpells.includes(id); }
+
     function unlock(group, key, text) {
       if (isUnlocked(group, key)) return false;
-      progress[group].push(key); persistProgress(); updateUnlockUI();
+      progress[group].push(key);
+      // 新解锁的法术若配置未满且不违反互斥，自动补进配置。
+      const def = spellDef(key);
+      if (def && progress.equippedSpells.length < MAX_EQUIPPED
+          && !(def.exclusive && progress.equippedSpells.some(id => spellDef(id).exclusive === def.exclusive))) {
+        progress.equippedSpells.push(key);
+      }
+      persistProgress(); updateUnlockUI();
       banner = { text, timer: 210 }; return true;
     }
 
@@ -799,14 +1020,18 @@
     function skillCooldown(skill) { return Math.round(skill.maxCd * (1 - progress.talents.spell * .1)); }
 
     function updateUnlockUI() {
-      const mapping = {
-        freeze: ['unlockedSkills','freeze'], sweep: ['unlockedSkills','sweep'],
-        fire: ['unlockedSkills','fire'], transform: ['unlockedSkills','transform'],
-        cloud: ['unlockedSkills','cloud'], pluck: ['unlockedSkills','pluck'],
-        pearl: ['unlockedRelics','pearl'], mantle: ['unlockedRelics','mantle']
-      };
-      for (const [id, [group,key]] of Object.entries(mapping)) {
-        document.getElementById(`skill-${id}`).classList.toggle('locked', !isUnlocked(group,key));
+      // 已配置的法术按规范顺序占用键位 1—4；未配置的槽位与触屏按钮隐藏。
+      const equippedOrdered = SPELL_DEFS.filter(d => isEquipped(d.id)).map(d => d.id);
+      for (const def of SPELL_DEFS) {
+        const el = document.getElementById(`skill-${def.id}`);
+        el.classList.toggle('locked', !isUnlocked(def.group, def.id));
+        const slot = equippedOrdered.indexOf(def.id);
+        el.style.display = slot >= 0 ? '' : 'none';
+        if (slot >= 0) el.querySelector('.key').textContent = String(slot + 1);
+      }
+      for (const btn of document.querySelectorAll('.tbtn[data-act]')) {
+        const def = spellDef(btn.dataset.act);
+        if (def) btn.style.display = isEquipped(def.id) ? '' : 'none';
       }
       const available = STANCES.filter(s => isUnlocked('unlockedStances', s.kind));
       if (!available.some(s => s.kind === STANCES[stanceIdx].kind)) stanceIdx = STANCES.findIndex(s => available.some(a => a.kind === s.kind));
@@ -855,6 +1080,11 @@
     let kuhaiTimer = 0;
     let leiyinBossIdx = 0;
     let nextLeiyinBossCountdown = 0;
+    // 黄眉终局战状态机：0 未触发 / 1 大殿交手 / 2 人种袋内 / 3 破袋再战。
+    let huangmeiFight = { phase: 0, savedHp: 0 };
+    let sackCountdown = 0;
+    let exitSackCountdown = 0;
+    let victoryCountdown = 0;
     let score = 0;
     let kills = 0;
     let bossActive = false;
@@ -1108,6 +1338,9 @@
         leiyinBossIdx++;
         spawnLeiyinBoss();
       }
+      if (currentMap === 'leiyin' && sackCountdown > 0 && --sackCountdown === 0) enterRenzhongdai();
+      if (currentMap === 'renzhongdai' && exitSackCountdown > 0 && --exitSackCountdown === 0) exitRenzhongdai();
+      if (currentMap === 'leiyin' && victoryCountdown > 0 && --victoryCountdown === 0) gameOver(true);
     }
 
     // 浮屠界：魔将妙音镇守的高塔战场。
@@ -1355,6 +1588,10 @@
       bossActive = false;
       bossHpEl.style.display = 'none';
       nextLeiyinBossCountdown = 0;
+      huangmeiFight = { phase: 0, savedHp: 0 };
+      sackCountdown = 0;
+      exitSackCountdown = 0;
+      victoryCountdown = 0;
       leiyinBossIdx = Math.max(0, Math.min(startIndex, LEIYIN_BOSSES.length));
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 300;
@@ -1377,6 +1614,154 @@
 
     function enterLeiyin() {
       setupLeiyin(progress.leiyinBossIndex || 0);
+    }
+
+    // 黄眉终局战：一阶段大殿交手，半血后被收入人种袋战赤尻马猴，破袋后与黄眉真身决战。
+    function spawnHuangmeiBoss(hp, enraged) {
+      const x = WORLD.w / 2, y = 420;
+      enemies.push({
+        type: 'huangmeiboss',
+        name: enraged ? '黄眉（真身）' : '黄眉',
+        enraged,
+        x, y,
+        radius: 36,
+        hp,
+        maxHp: 2600,
+        dmg: enraged ? 46 : 40,
+        speed: enraged ? 1.75 : 1.45,
+        aggro: 9999,
+        isBoss: true,
+        atk: 'melee',
+        atkCycle: enraged ? ['aoe', 'ranged', 'lunge', 'melee'] : ['melee', 'ranged', 'lunge', 'aoe'],
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'chase',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0
+      });
+      bossActive = true;
+      if (enraged) {
+        setObjective('第三章 · 大雄宝殿：黄眉真身现，决一死战！');
+        banner = { text: '黄眉真身现！再来打过！', timer: 180 };
+      } else {
+        setObjective('第三章 · 大雄宝殿：击败黄眉');
+        banner = { text: '既见未来，为何不拜！', timer: 180 };
+      }
+      createParticles(x, y - 36, '#e9c86a', 28);
+      updateUI();
+    }
+
+    function spawnMacaque() {
+      enemies.push({
+        type: 'macaque',
+        name: '赤尻马猴',
+        x: WORLD.w / 2,
+        y: 520,
+        radius: 28,
+        hp: 1800,
+        maxHp: 1800,
+        dmg: 34,
+        speed: 1.9,
+        aggro: 9999,
+        isBoss: true,
+        atk: 'lunge',
+        atkCycle: ['lunge', 'melee', 'melee', 'aoe'],
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'chase',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0
+      });
+      bossActive = true;
+    }
+
+    // 人种袋内：血肉密室，赤尻马猴守袋。
+    function enterRenzhongdai() {
+      currentMap = 'renzhongdai';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      ally = null;
+      for (let i = 0; i < 3; i++) {
+        peaches.push({
+          x: randomRange(300, WORLD.w - 300),
+          y: randomRange(600, WORLD.h - 300),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 280;
+      spawnMacaque();
+      setObjective('第三章 · 人种袋：击败赤尻马猴，打破后天袋！');
+      banner = { text: '人种袋 · 赤尻马猴守袋', timer: 170 };
+      updateUI();
+    }
+
+    // 破袋而出：回大雄宝殿，黄眉以剩余血量狂暴回归。
+    function exitRenzhongdai() {
+      currentMap = 'leiyin';
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      ally = null;
+      for (let i = 0; i < 5; i++) {
+        peaches.push({
+          x: randomRange(420, WORLD.w - 420),
+          y: randomRange(760, WORLD.h - 260),
+          pulse: randomRange(0, Math.PI * 2)
+        });
+      }
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 420;
+      huangmeiFight.phase = 3;
+      spawnHuangmeiBoss(Math.max(1, huangmeiFight.savedHp), true);
+    }
+
+    function updateHuangmeiFight() {
+      if (currentMap !== 'leiyin') return;
+      // 四护法全破后，北行深入大殿触发黄眉之战。
+      if (huangmeiFight.phase === 0 && progress.completedLeiyinGuardians && !progress.completedChapter3
+          && player.y < 780) {
+        huangmeiFight.phase = 1;
+        spawnHuangmeiBoss(2600, false);
+        return;
+      }
+      // 一阶段血量压到 55%：黄眉祭出人种袋，将天命人收入袋中。
+      if (huangmeiFight.phase === 1) {
+        const hm = enemies.find(e => e.type === 'huangmeiboss');
+        if (hm && hm.hp <= hm.maxHp * 0.55) {
+          huangmeiFight.phase = 2;
+          huangmeiFight.savedHp = Math.max(1, Math.round(hm.hp));
+          enemies = enemies.filter(e => e !== hm);
+          bossActive = false;
+          bossHpEl.style.display = 'none';
+          skillFx.push({ type: 'freezewave', life: 1 });
+          banner = { text: '黄眉祭出人种袋：猴子孙子，进来吧！', timer: 170 };
+          sackCountdown = 150;
+        }
+      }
     }
 
     function spawnKangjinlong() {
@@ -1994,6 +2379,10 @@
       kuhaiTimer = 0;
       leiyinBossIdx = 0;
       nextLeiyinBossCountdown = 0;
+      huangmeiFight = { phase: 0, savedHp: 0 };
+      sackCountdown = 0;
+      exitSackCountdown = 0;
+      victoryCountdown = 0;
       document.getElementById('slot-sober').style.visibility = 'hidden';
       player.hasMantle = false;
       applyPersistentState();
@@ -2140,6 +2529,27 @@
             persistProgress();
             banner = { text: '黑风山已破！前往黄风岭……', timer: 170 };
             chapterCountdown = 200;
+            updateUI();
+            return false;
+          }
+          if (e.type === 'macaque') {
+            // 袋中守将已灭：人种袋破裂，回到大殿与黄眉真身决战。
+            grantBossReward('macaque', 320);
+            bossActive = false;
+            banner = { text: '赤尻马猴已灭！人种袋破开一道口子……', timer: 180 };
+            exitSackCountdown = 170;
+            updateUI();
+            return false;
+          }
+          if (e.type === 'huangmeiboss') {
+            // 第三章通关：黄眉伏诛，小西天重见天日。
+            grantBossReward('huangmei', 450);
+            bossActive = false;
+            progress.completedChapter3 = true;
+            huangmeiFight.phase = 4;
+            persistProgress();
+            banner = { text: '黄眉已灭！小西天重见天日！', timer: 220 };
+            victoryCountdown = 240;
             updateUI();
             return false;
           }
@@ -2878,6 +3288,49 @@
     // ---------- 绘制 ----------
 
     function drawGround() {
+      if (currentMap === 'renzhongdai') {
+        // 人种袋内：血肉密室，暗红褶皱随帧数轻轻蠕动。
+        const flesh = ctx.createRadialGradient(
+          canvas.width / 2, canvas.height / 2, 60,
+          canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * .75);
+        flesh.addColorStop(0, '#6e2a26');
+        flesh.addColorStop(.6, '#4a1a1c');
+        flesh.addColorStop(1, '#2a0d12');
+        ctx.fillStyle = flesh;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 以袋心为圆心的环状褶皱。
+        const cx = WORLD.w / 2 - camera.x;
+        const cy = WORLD.h / 2 - camera.y;
+        for (let i = 0; i < 9; i++) {
+          const r = 130 + i * 150 + Math.sin(frameCount * .02 + i) * 9;
+          ctx.strokeStyle = `rgba(${150 + (i % 2) * 40},52,48,${.34 - i * .025})`;
+          ctx.lineWidth = Math.max(3, 16 - i);
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 盘曲的血管。
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 26; i++) {
+          const gx = seeded(i + 21000) * WORLD.w;
+          const gy = seeded(i + 21400) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -120 || sy < -120 || sx > canvas.width + 120 || sy > canvas.height + 120) continue;
+          ctx.strokeStyle = `rgba(210,${70 + Math.round(seeded(i) * 40)},64,${.22 + seeded(i + 1) * .2})`;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.bezierCurveTo(
+            sx + 60 - seeded(i + 2) * 120, sy + 40 - seeded(i + 3) * 80,
+            sx + 120 - seeded(i + 4) * 240, sy + 90 - seeded(i + 5) * 180,
+            sx + 180 - seeded(i + 6) * 360, sy + 140 - seeded(i + 7) * 280);
+          ctx.stroke();
+        }
+        return;
+      }
+
       if (currentMap === 'leiyin') {
         // 小雷音寺：积雪覆盖的灰白石庭，中轴铺着暗红朝道。
         const stone = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -3273,6 +3726,37 @@
     }
 
     function drawDecor() {
+      if (currentMap === 'renzhongdai') {
+        // 袋壁上的肉瘤与残渣白骨。
+        for (let i = 0; i < 34; i++) {
+          const gx = seeded(i + 22000) * WORLD.w;
+          const gy = seeded(i + 22400) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) continue;
+          if (seeded(i + 22500) < .55) {
+            ctx.fillStyle = `rgba(122,44,40,${.5 + seeded(i) * .3})`;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, 12 + seeded(i + 1) * 26, 8 + seeded(i + 2) * 16, seeded(i + 3) * 2.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(190,90,80,.35)';
+            ctx.beginPath();
+            ctx.arc(sx - 4, sy - 4, 4 + seeded(i + 4) * 6, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.strokeStyle = 'rgba(226,214,188,.4)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(sx - 12, sy);
+            ctx.lineTo(sx + 12, sy + 6);
+            ctx.moveTo(sx, sy - 8);
+            ctx.lineTo(sx + 8, sy + 12);
+            ctx.stroke();
+          }
+        }
+        return;
+      }
+
       if (currentMap === 'leiyin') {
         const cx = WORLD.w / 2;
 
@@ -5991,6 +6475,173 @@
       ctx.restore();
     }
 
+    // 黄眉（BOSS 形态）：黄袍胖身、垂肩大耳、左手托人种袋；真身形态目露凶光。
+    function drawHuangmeiBoss(e, sx, sy) {
+      const u = e.radius * 1.05;
+      const bob = Math.sin(frameCount * 0.06) * 1.5;
+      const enraged = e.enraged;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.5, u * 2.1);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.2, u * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 黄袍胖身。
+      const robe = ctx.createRadialGradient(-u * 0.2, -u * 1.6, u * 0.2, 0, -u * 1.1, u * 1.3);
+      robe.addColorStop(0, enraged ? '#e0b03a' : '#d4af37');
+      robe.addColorStop(1, enraged ? '#7a4d12' : '#8a6a1e');
+      ctx.fillStyle = robe;
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.1, u * 1.05, u * 1.05, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#6e4f10';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, -u * 1.1, u * 1.03, Math.PI * 0.2, Math.PI * 0.8);
+      ctx.stroke();
+
+      // 双臂，左手托人种袋。
+      ctx.fillStyle = '#b8922a';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.95, -u * 1.15, u * 0.24, u * 0.5, 0.4, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.95, -u * 1.15, u * 0.24, u * 0.5, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#8a8578';
+      ctx.beginPath();
+      ctx.moveTo(-u * 1.35, -u * 1.35);
+      ctx.quadraticCurveTo(-u * 1.5, -u * 0.9, -u * 1.2, -u * 0.8);
+      ctx.quadraticCurveTo(-u * 0.9, -u * 0.9, -u * 1.0, -u * 1.35);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#5c574a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-u * 1.32, -u * 1.3);
+      ctx.lineTo(-u * 1.03, -u * 1.3);
+      ctx.stroke();
+
+      // 大脑袋与垂肩大耳。
+      ctx.fillStyle = '#e8c8a0';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.55, u * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.62, -u * 2.5, u * 0.16, u * 0.42, 0.15, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.62, -u * 2.5, u * 0.16, u * 0.42, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+      // 黄色长眉。
+      ctx.strokeStyle = '#e8c53a';
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.32, -u * 2.72);
+      ctx.quadraticCurveTo(-u * 0.5, -u * 2.5, -u * 0.42, -u * 2.2);
+      ctx.moveTo(u * 0.32, -u * 2.72);
+      ctx.quadraticCurveTo(u * 0.5, -u * 2.5, u * 0.42, -u * 2.2);
+      ctx.stroke();
+      // 眯眼与笑嘴；真身形态改为怒目。
+      ctx.strokeStyle = enraged ? '#a01808' : '#3a2018';
+      ctx.lineWidth = enraged ? 3 : 2;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.24, -u * 2.58);
+      ctx.lineTo(-u * 0.08, -u * 2.58);
+      ctx.moveTo(u * 0.08, -u * 2.58);
+      ctx.lineTo(u * 0.24, -u * 2.58);
+      ctx.stroke();
+      ctx.beginPath();
+      if (enraged) ctx.arc(0, -u * 2.34, u * 0.14, Math.PI + 0.3, Math.PI * 2 - 0.3);
+      else ctx.arc(0, -u * 2.4, u * 0.16, 0.3, Math.PI - 0.3);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // 赤尻马猴：棕毛长臂、红尻卷尾的凶猿。
+    function drawMacaque(e, sx, sy) {
+      const u = e.radius * 1.1;
+      const bob = Math.sin(frameCount * 0.09) * 2;
+
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+
+      if (e.state === 'windup') drawWindupRing(0, -u * 1.2, u * 1.8);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.1, u * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 卷尾。
+      ctx.strokeStyle = '#6d4426';
+      ctx.lineWidth = u * 0.14;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(u * 0.7, -u * 0.5);
+      ctx.quadraticCurveTo(u * 1.5, -u * 0.7, u * 1.3, -u * 1.4);
+      ctx.stroke();
+
+      // 红尻与后腿。
+      ctx.fillStyle = '#c23a28';
+      ctx.beginPath();
+      ctx.ellipse(u * 0.5, -u * 0.45, u * 0.34, u * 0.4, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#7a4a2a';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.45, -u * 0.35, u * 0.26, u * 0.38, 0.25, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.3, -u * 0.3, u * 0.26, u * 0.36, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 棕毛躯干（前倾佝偻）。
+      const body = ctx.createRadialGradient(-u * 0.2, -u * 1.2, u * 0.2, 0, -u * 0.9, u * 1.1);
+      body.addColorStop(0, '#9a6238');
+      body.addColorStop(1, '#5f3a20');
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 0.85, u * 0.8, u * 0.85, 0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 长臂撑地。
+      ctx.strokeStyle = '#7a4a2a';
+      ctx.lineWidth = u * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.55, -u * 1.0);
+      ctx.lineTo(-u * 0.95, -u * 0.05);
+      ctx.moveTo(u * 0.55, -u * 1.05);
+      ctx.lineTo(u * 0.95, -u * 0.1);
+      ctx.stroke();
+
+      // 头颅：白发顶、赤面獠牙。
+      ctx.fillStyle = '#e8e3d8';
+      ctx.beginPath();
+      ctx.arc(0, -u * 1.85, u * 0.42, Math.PI * 0.9, Math.PI * 2.1);
+      ctx.fill();
+      ctx.fillStyle = '#b5402e';
+      ctx.beginPath();
+      ctx.arc(0, -u * 1.78, u * 0.36, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1a0d08';
+      ctx.beginPath();
+      ctx.arc(-u * 0.14, -u * 1.84, u * 0.055, 0, Math.PI * 2);
+      ctx.arc(u * 0.14, -u * 1.84, u * 0.055, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f5f0e0';
+      ctx.beginPath();
+      ctx.moveTo(-u * 0.1, -u * 1.62);
+      ctx.lineTo(-u * 0.05, -u * 1.5);
+      ctx.lineTo(0, -u * 1.62);
+      ctx.moveTo(u * 0.02, -u * 1.62);
+      ctx.lineTo(u * 0.07, -u * 1.5);
+      ctx.lineTo(u * 0.12, -u * 1.62);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
     function drawEnemy(e) {
       const sx = e.x - camera.x;
       const sy = e.y - camera.y;
@@ -6027,6 +6678,8 @@
         else if (e.type === 'shixian') drawShixian(e, 0, 0);
         else if (e.type === 'huxian') drawHuxian(e, 0, 0);
         else if (['buneng', 'bubai', 'bujing', 'bukong'].includes(e.type)) drawLeiyinMonk(e, 0, 0);
+        else if (e.type === 'huangmeiboss') drawHuangmeiBoss(e, 0, 0);
+        else if (e.type === 'macaque') drawMacaque(e, 0, 0);
         else drawBossBear(e, 0, 0);
       }
       else if (e.type === 'wolf') drawWolfChar(e, 0, 0);
@@ -6796,7 +7449,7 @@
       while (!modalOpen && frameAccumulator >= FIXED_STEP) {
         frameCount++;
         updatePlayer(); updateStaff(); updateSkills(); updateEnemies(); updatePeaches();
-        updateBells(); updateAlly(); updateMonkeyClones(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai();
+        updateBells(); updateAlly(); updateMonkeyClones(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai(); updateHuangmeiFight();
         updateProjectiles(); updateParticles(); updateSlashes(); updateDamageTexts();
         frameAccumulator -= FIXED_STEP;
       }
@@ -6809,9 +7462,12 @@
       gameRunning = false;
       overlayTitle.textContent = win ? '功德圆满' : '天命人陨落';
       overlayTitle.style.color = win ? '#ffd700' : '#e94560';
+      const CHECKPOINT_NAMES = { huangfeng: '黄风岭', icelake: '冰湖', futu: '浮屠界', kuhai: '苦海北岸', leiyin: '小雷音寺' };
       overlayMsg.textContent = win
-        ? `你击败了黄风大圣，第二章完！第三章敬请期待。最终得分: ${score}`
-        : checkpoint ? `最终得分: ${score}（将在黄风岭存档点复活）` : `最终得分: ${score}`;
+        ? (progress.completedChapter3
+          ? `黄眉已灭，三章俱破！真经在手，天下太平。最终得分: ${score}`
+          : `你击败了黄风大圣，第二章完！第三章敬请期待。最终得分: ${score}`)
+        : checkpoint ? `最终得分: ${score}（将在${CHECKPOINT_NAMES[checkpoint.map] || '黄风岭'}存档点复活）` : `最终得分: ${score}`;
       overlay.style.display = 'block';
     }
 
@@ -6849,7 +7505,7 @@
         gameLoop();
         return;
       }
-      if (checkpoint && checkpoint.map === 'leiyin' && currentMap === 'leiyin') {
+      if (checkpoint && checkpoint.map === 'leiyin' && (currentMap === 'leiyin' || currentMap === 'renzhongdai')) {
         overlay.style.display = 'none';
         setupLeiyin(checkpoint.bossIndex ?? progress.leiyinBossIndex ?? 0);
         banner = { text: '于小雷音寺存档点复活', timer: 140 };
@@ -6877,6 +7533,21 @@
       stanceIdx = next; stanceNameEl.textContent = STANCES[stanceIdx].name;
     }
 
+    // 法术施放统一入口：只有已配置到土地庙的法术才能施放。
+    const SPELL_CASTS = {
+      freeze: castFreeze, sweep: castSweep, fire: castFire, transform: castTransform,
+      pearl: castPearl, mantle: castMantle, cloud: castCloudStep, pluck: castPluckOfMany
+    };
+    function castSpell(id) {
+      if (!isEquipped(id)) return;
+      SPELL_CASTS[id]();
+    }
+    // 键位 1—4 与技能栏一致，按规范顺序对应已配置法术。
+    function castEquippedSlot(n) {
+      const def = SPELL_DEFS.filter(d => isEquipped(d.id))[n - 1];
+      if (def) castSpell(def.id);
+    }
+
     window.addEventListener('keydown', (e) => {
       keys[e.key] = true;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
@@ -6887,22 +7558,20 @@
         else if (!startMenuEl.classList.contains('visible')) openTalentPanel(false);
         return;
       }
+      if (e.key === 'p' || e.key === 'P') {
+        if (mapPanelEl.classList.contains('visible')) closeMapPanel();
+        else openMapPanel();
+        return;
+      }
       if (modalOpen) return;
-      if (e.repeat && ['j','J','q','Q','1','2','3','4','5','6','7','8','Shift'].includes(e.key)) return;
+      if (e.repeat && ['j','J','q','Q','1','2','3','4','Shift'].includes(e.key)) return;
       if (e.key === ' ') {
         startCharge();
       }
       if (e.key === 'j' || e.key === 'J') {
         startSwing(1);
       }
-      if (e.key === '1') castFreeze();
-      if (e.key === '2') castSweep();
-      if (e.key === '3') castFire();
-      if (e.key === '4') castTransform();
-      if (e.key === '5') castPearl();
-      if (e.key === '6') castMantle();
-      if (e.key === '7') castCloudStep();
-      if (e.key === '8') castPluckOfMany();
+      if (['1','2','3','4'].includes(e.key)) castEquippedSlot(Number(e.key));
       if (e.key === 'q' || e.key === 'Q') {
         cycleStance();
       }
@@ -7006,15 +7675,9 @@
           cycleStance();
         } else if (act === 'dodge') {
           startDodge(player.moveDx || Math.cos(player.angle), player.moveDy || Math.sin(player.angle));
-        } else if (act === 'freeze') castFreeze();
-        else if (act === 'sweep') castSweep();
-        else if (act === 'fire') castFire();
-        else if (act === 'transform') castTransform();
-        else if (act === 'pearl') castPearl();
-        else if (act === 'mantle') castMantle();
-        else if (act === 'cloud') castCloudStep();
-        else if (act === 'pluck') castPluckOfMany();
+        } else if (spellDef(act)) castSpell(act);
         else if (act === 'talent') openTalentPanel(false);
+        else if (act === 'map') openMapPanel();
         e.preventDefault();
       }, { passive: false });
     }

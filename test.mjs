@@ -37,8 +37,8 @@ class Element {
   addEventListener() {}
   appendChild(child) { this.children.push(child); }
   querySelector(selector) {
-    if (selector === '.cd') this.cd ||= new Element();
-    return this.cd;
+    this._qs ||= {};
+    return this._qs[selector] ||= new Element();
   }
 }
 
