@@ -441,7 +441,7 @@
   <h1>哈悟空</h1>
   <div id="info">
     WASD 移动探索，空格长按蓄力、松开重击（劈棍可走位，立棍/戳棍须站定），连续点按 J / 点击使出五段轻棍，Shift 闪避<br/>
-    Q 切换已解锁棍式 · 1—4 法术与变化 · 5—6 法宝 · T 土地庙悟道<br/>
+    Q 切换已解锁棍式 · 1—8 法术、变化与法宝 · T 土地庙悟道<br/>
     法术与变化消耗法力，轻重攻击与闪避消耗气力
   </div>
   <div id="score-board">得分: 0 | 击杀: 0</div>
@@ -470,6 +470,8 @@
       <div class="skill" id="skill-pearl"><span class="key">5</span>定风珠<span class="cd"></span></div>
       <div class="skill" id="slot-sober" style="visibility:hidden"><span class="key">石</span>醒酒石</div>
       <div class="skill" id="skill-mantle"><span class="key">6</span>避火罩<span class="cd"></span></div>
+      <div class="skill" id="skill-cloud"><span class="key">7</span>聚形散气<span class="cd"></span></div>
+      <div class="skill" id="skill-pluck"><span class="key">8</span>身外身法<span class="cd"></span></div>
       <div class="skill"><span class="key">T</span>土地庙</div>
     </div>
   </div>
@@ -488,6 +490,8 @@
       <button class="tbtn" data-act="transform">变身</button>
       <button class="tbtn" data-act="pearl">定风</button>
       <button class="tbtn" data-act="mantle">避火</button>
+      <button class="tbtn" data-act="cloud">隐身</button>
+      <button class="tbtn" data-act="pluck">分身</button>
       <button class="tbtn" data-act="talent">悟道</button>
       <button class="tbtn" data-act="dodge">闪避</button>
       <button class="tbtn" id="btn-attack">攻击</button>
@@ -550,7 +554,7 @@
       spirit: 0, cultivation: 0, chapterUnlocked: 1, chapter2Checkpoint: 0,
       chapter3Checkpoint: 'intro', reachedKuhai: false, reachedLeiyin: false,
       leiyinBossIndex: 0, completedLeiyinGuardians: false,
-      unlockedStances: ['chop'], unlockedSkills: ['freeze'], unlockedRelics: [],
+      unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [],
       talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false
     };
 
@@ -574,12 +578,12 @@
           completedChapter3: raw.reachedKuhai ? Boolean(raw.completedChapter3) : false,
           talents: { ...DEFAULT_PROGRESS.talents, ...(raw.talents || {}) },
           unlockedStances: [...new Set(['chop', ...list(raw.unlockedStances)])],
-          unlockedSkills: [...new Set(['freeze', ...list(raw.unlockedSkills)])],
+          unlockedSkills: [...new Set(['freeze', 'cloud', 'pluck', ...list(raw.unlockedSkills)])],
           unlockedRelics: [...new Set(list(raw.unlockedRelics))],
           bossRewards
         };
       } catch {
-        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze'], unlockedRelics: [], bossRewards: [] };
+        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [], bossRewards: [] };
       }
     }
 
@@ -760,11 +764,16 @@
       sweep: { cd: 0, maxCd: 480, el: document.getElementById('skill-sweep') },
       fire: { cd: 0, maxCd: 900, el: document.getElementById('skill-fire') },
       transform: { cd: 0, maxCd: 1500, el: document.getElementById('skill-transform') },
-      pearl: { cd: 0, maxCd: 1800, el: document.getElementById('skill-pearl') }
+      pearl: { cd: 0, maxCd: 1800, el: document.getElementById('skill-pearl') },
+      cloud: { cd: 0, maxCd: 1080, el: document.getElementById('skill-cloud') },
+      pluck: { cd: 0, maxCd: 1800, el: document.getElementById('skill-pluck') }
     };
     // 广智变身改为短时间强化；冷却从变身结束后开始。
     const transform = { active: false, timer: 0, duration: 600, dmgMult: 1.75, speedMult: 1.25 };
     const mantle = { active: false, timer: 0, duration: 480, cd: 0, maxCd: 1800, el: document.getElementById('skill-mantle') };
+    const stealth = { active: false, timer: 0, duration: 360 };
+    const pluck = { timer: 0, duration: 720 };
+    let monkeyClones = [];
     let skillFx = [];
 
     function applyTalentStats(heal = true) {
@@ -793,6 +802,7 @@
       const mapping = {
         freeze: ['unlockedSkills','freeze'], sweep: ['unlockedSkills','sweep'],
         fire: ['unlockedSkills','fire'], transform: ['unlockedSkills','transform'],
+        cloud: ['unlockedSkills','cloud'], pluck: ['unlockedSkills','pluck'],
         pearl: ['unlockedRelics','pearl'], mantle: ['unlockedRelics','mantle']
       };
       for (const [id, [group,key]] of Object.entries(mapping)) {
@@ -1646,6 +1656,152 @@
       }
     }
 
+    function nearestLivingEnemy(x, y, maxDist = Infinity) {
+      let target = null;
+      let best = maxDist;
+      for (const e of enemies) {
+        if (e.hp <= 0) continue;
+        const d = Math.hypot(e.x - x, e.y - y);
+        if (d < best) {
+          best = d;
+          target = e;
+        }
+      }
+      return target;
+    }
+
+    function cloneStaffHit(c) {
+      const st = STANCES.find(item => item.kind === c.attackKind) || STANCES[0];
+      const ca = Math.cos(c.angle);
+      const sa = Math.sin(c.angle);
+      const damage = Math.round(rollDamage() * st.dmg * .42 * (1 + progress.talents.staff * .08));
+      let hit = false;
+      for (const e of enemies) {
+        if (e.hp <= 0) continue;
+        const dx = e.x - c.x;
+        const dy = e.y - c.y;
+        if (st.kind === 'vault') {
+          const tx = c.x + ca * 82;
+          const ty = c.y + sa * 82;
+          if (Math.hypot(e.x - tx, e.y - ty) > 72 + e.radius) continue;
+        } else if (st.kind === 'thrust') {
+          const along = dx * ca + dy * sa;
+          const perp = Math.abs(-dx * sa + dy * ca);
+          if (along < 0 || along > 150 + e.radius || perp > 24 + e.radius) continue;
+        } else {
+          if (Math.hypot(dx, dy) > 105 + e.radius) continue;
+          if (Math.abs(angleDiff(Math.atan2(dy, dx), c.angle)) > .7) continue;
+        }
+        applyDamage(e, damage);
+        hit = true;
+      }
+      const slash = {
+        kind: st.kind,
+        x: c.x,
+        y: c.y,
+        angle: c.angle,
+        arc: st.arc || .8,
+        range: st.kind === 'thrust' ? 150 : 105,
+        radius: 76,
+        power: 1.35,
+        fire: transform.active,
+        life: 1
+      };
+      if (st.kind === 'vault') {
+        slash.tx = c.x + ca * 82;
+        slash.ty = c.y + sa * 82;
+      }
+      slashes.push(slash);
+      return hit;
+    }
+
+    function updateMonkeyClones() {
+      if (!monkeyClones.length) return;
+      let hit = false;
+      const count = monkeyClones.length;
+      for (let i = 0; i < count; i++) {
+        const c = monkeyClones[i];
+        c.bob += .12;
+        if (c.attackCd > 0) c.attackCd--;
+        if (c.attackTimer > 0) {
+          c.attackTimer--;
+          if (c.attackTimer === 8) hit = cloneStaffHit(c) || hit;
+          continue;
+        }
+
+        // 战斗中追最近目标；无目标时围绕本体结阵，掉队过远则化烟回归。
+        const target = nearestLivingEnemy(c.x, c.y, 720);
+        if (!target) {
+          const orbit = Math.PI * 2 * c.slot / count + frameCount * .008;
+          const fx = player.x + Math.cos(orbit) * (58 + (c.slot % 2) * 18);
+          const fy = player.y + Math.sin(orbit) * (42 + (c.slot % 2) * 14);
+          const dx = fx - c.x;
+          const dy = fy - c.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 460) {
+            c.x = fx;
+            c.y = fy;
+            createParticles(c.x, c.y, '#d7c06b', 7);
+          } else if (dist > 4) {
+            c.x += dx / dist * Math.min(3.1, dist);
+            c.y += dy / dist * Math.min(3.1, dist);
+          }
+          continue;
+        }
+
+        const dx = target.x - c.x;
+        const dy = target.y - c.y;
+        const dist = Math.hypot(dx, dy);
+        c.angle = Math.atan2(dy, dx);
+        c.facing = dx >= 0 ? 1 : -1;
+        const kind = STANCES[stanceIdx].kind;
+        const reach = kind === 'thrust' ? 138 : kind === 'vault' ? 105 : 92;
+        if (dist > reach) {
+          c.x += dx / dist * 3;
+          c.y += dy / dist * 3;
+        } else if (c.attackCd <= 0) {
+          c.attackKind = kind;
+          c.attackDuration = kind === 'chop' ? 24 : 18;
+          c.attackTimer = c.attackDuration;
+          c.attackCd = 38 + c.slot * 3;
+        }
+        c.x = clamp(c.x, c.radius, WORLD.w - c.radius);
+        c.y = clamp(c.y, c.radius, WORLD.h - c.radius);
+      }
+      if (hit) handleKills();
+    }
+
+    // 本体施法时，毫毛分身从各自位置施放缩小版同类法术。
+    function echoCloneSkill(kind) {
+      if (!monkeyClones.length) return false;
+      let hit = false;
+      for (const c of monkeyClones) {
+        if (kind === 'freeze') {
+          skillFx.push({ type: 'clonering', x: c.x, y: c.y, life: 1, color: '#9ed8ff', max: 190 });
+          for (const e of enemies) {
+            if (e.hp <= 0 || Math.hypot(e.x - c.x, e.y - c.y) > 190) continue;
+            e.frozen = Math.max(e.frozen, 90);
+            e.freezeBonusUsed = false;
+            hit = true;
+          }
+        } else if (kind === 'sweep') {
+          skillFx.push({ type: 'clonering', x: c.x, y: c.y, life: 1, color: '#ffd76a', max: 120 });
+          for (const e of enemies) {
+            if (e.hp <= 0 || Math.hypot(e.x - c.x, e.y - c.y) > 120 + e.radius) continue;
+            applyDamage(e, 18);
+            hit = true;
+          }
+        } else if (kind === 'fire') {
+          const target = nearestLivingEnemy(c.x, c.y, 380);
+          if (!target) continue;
+          skillFx.push({ type: 'beam', x1: c.x, y1: c.y, x2: target.x, y2: target.y - target.radius, life: 1 });
+          applyDamage(target, 20);
+          hit = true;
+        }
+      }
+      return hit;
+    }
+
     // 黄袍员外：醉卧在黄风岭最右侧，给他醒酒石即可开启斯哈里国。
     function updatePigNpc() {
       if (currentMap !== 'huangfeng' || !pigNpc) return;
@@ -1781,6 +1937,12 @@
       transform.active = false;
       transform.timer = 0;
       skills.transform.el.classList.remove('active');
+      stealth.active = false;
+      stealth.timer = 0;
+      pluck.timer = 0;
+      monkeyClones = [];
+      skills.cloud.el.classList.remove('active', 'on-cd');
+      skills.pluck.el.classList.remove('active', 'on-cd');
       mantle.active = false;
       mantle.timer = 0;
       mantle.cd = 0;
@@ -1886,6 +2048,8 @@
       }
       const staminaCost = isLight ? attack.stamina : Math.round(10 + power * 3);
       if (!spendResource('stamina', staminaCost)) return;
+      // 聚形散气允许全程蓄力，直到真正出棍才显形。
+      revealFromStealth();
       combo.count = isLight ? attack.stage : 0;
       combo.timer = isLight ? combo.window : 0;
       staff.attack = attack;
@@ -2139,11 +2303,14 @@
       const s = skills.freeze;
       if (!isUnlocked('unlockedSkills','freeze') || s.cd > 0 || !gameRunning || modalOpen) return;
       const targets = enemies.filter(e => Math.hypot(e.x - player.x, e.y - player.y) <= 420);
-      if (!targets.length || !spendResource('mana', 25)) return;
+      const cloneHasTarget = monkeyClones.some(c => enemies.some(e => e.hp > 0 && Math.hypot(e.x - c.x, e.y - c.y) <= 190));
+      if ((!targets.length && !cloneHasTarget) || !spendResource('mana', 25)) return;
+      revealFromStealth();
       for (const e of targets) {
         e.frozen = FREEZE_DURATION;
         e.freezeBonusUsed = false;
       }
+      echoCloneSkill('freeze');
       s.cd = skillCooldown(s);
       skillFx.push({ type: 'freezewave', life: 1 });
     }
@@ -2153,6 +2320,7 @@
       const s = skills.sweep;
       if (!isUnlocked('unlockedSkills','sweep') || s.cd > 0 || !gameRunning || modalOpen) return;
       if (!spendResource('mana', 30)) return;
+      revealFromStealth();
       s.cd = skillCooldown(s);
       let hit = false;
       for (const e of enemies) {
@@ -2167,6 +2335,7 @@
         }
         hit = true;
       }
+      hit = echoCloneSkill('sweep') || hit;
       skillFx.push({ type: 'ring', x: player.x, y: player.y, life: 1 });
       tryRingBells(170, null, null);
       if (hit) handleKills();
@@ -2185,18 +2354,24 @@
           target = e;
         }
       }
-      if (!target) return;
+      const cloneHasTarget = monkeyClones.some(c => nearestLivingEnemy(c.x, c.y, 380));
+      if (!target && !cloneHasTarget) return;
       if (!spendResource('mana', 40)) return;
+      revealFromStealth();
       s.cd = skillCooldown(s);
-      skillFx.push({ type: 'beam', x1: player.x, y1: player.y, x2: target.x, y2: target.y - target.radius, life: 1 });
-      applyDamage(target, 120);
-      handleKills();
+      if (target) {
+        skillFx.push({ type: 'beam', x1: player.x, y1: player.y, x2: target.x, y2: target.y - target.radius, life: 1 });
+        applyDamage(target, 120);
+      }
+      const cloneHit = echoCloneSkill('fire');
+      if (target || cloneHit) handleKills();
     }
 
     function castTransform() {
       const s = skills.transform;
       if (!isUnlocked('unlockedSkills','transform') || s.cd > 0 || transform.active || !gameRunning || modalOpen) return;
       if (!spendResource('mana', 50)) return;
+      revealFromStealth();
       transform.active = true;
       transform.timer = transform.duration;
       createParticles(player.x, player.y, '#ff7a2a', 24);
@@ -2217,6 +2392,62 @@
       mantle.active = true; mantle.timer = mantle.duration;
       createParticles(player.x, player.y, '#ff8a3a', 28);
       banner = { text: '避火罩护体：8秒内减伤60%', timer: 100 };
+    }
+
+    function revealFromStealth() {
+      if (!stealth.active) return;
+      stealth.active = false;
+      stealth.timer = 0;
+      skills.cloud.el.classList.remove('active');
+      createParticles(player.x, player.y, '#c7d8db', 16);
+    }
+
+    // 聚形散气：敌人失去锁定；蓄力不会打破隐身，真正攻击时才显形。
+    function castCloudStep() {
+      const s = skills.cloud;
+      if (!isUnlocked('unlockedSkills','cloud') || s.cd > 0 || stealth.active || !gameRunning || modalOpen) return;
+      if (!spendResource('mana', 35)) return;
+      stealth.active = true;
+      stealth.timer = stealth.duration;
+      s.cd = skillCooldown(s);
+      for (const e of enemies) {
+        if (e.state === 'chase' || e.state === 'windup') e.state = 'idle';
+        e.lungeT = 0;
+        e.aoeT = 0;
+      }
+      createParticles(player.x, player.y, '#d8e3df', 30);
+      skillFx.push({ type: 'cloud', x: player.x, y: player.y, life: 1 });
+      banner = { text: '聚形散气：隐去身形，可趁机蓄力', timer: 110 };
+    }
+
+    // 身外身法：拔毫成兵，召出 5～6 个会复制当前棍势和法术的分身。
+    function castPluckOfMany() {
+      const s = skills.pluck;
+      if (!isUnlocked('unlockedSkills','pluck') || s.cd > 0 || monkeyClones.length || !gameRunning || modalOpen) return;
+      if (!spendResource('mana', 60)) return;
+      const count = 5 + (Math.random() < .5 ? 0 : 1);
+      monkeyClones = [];
+      pluck.timer = pluck.duration;
+      for (let i = 0; i < count; i++) {
+        const a = Math.PI * 2 * i / count;
+        monkeyClones.push({
+          x: player.x + Math.cos(a) * 48,
+          y: player.y + Math.sin(a) * 36,
+          radius: 11,
+          slot: i,
+          angle: player.angle,
+          facing: Math.cos(player.angle) >= 0 ? 1 : -1,
+          attackCd: 18 + i * 5,
+          attackTimer: 0,
+          attackDuration: 18,
+          attackKind: STANCES[stanceIdx].kind,
+          bob: Math.random() * Math.PI * 2
+        });
+      }
+      s.cd = skillCooldown(s);
+      createParticles(player.x, player.y, '#f3d36b', 42);
+      skillFx.push({ type: 'cloneburst', x: player.x, y: player.y, life: 1 });
+      banner = { text: `身外身法：${count}个毫毛分身前来助战！`, timer: 120 };
     }
 
     function updateSkills() {
@@ -2256,6 +2487,39 @@
             size: randomRange(1.5, 3)
           });
         }
+      }
+      if (stealth.active) {
+        stealth.timer--;
+        const el = skills.cloud.el;
+        el.querySelector('.cd').textContent = Math.ceil(stealth.timer / 60) + 's';
+        el.classList.add('active');
+        el.classList.remove('on-cd');
+        if (frameCount % 5 === 0) {
+          particles.push({
+            x: player.x + randomRange(-24, 24),
+            y: player.y + randomRange(-34, 8),
+            vx: randomRange(-.5, .5),
+            vy: randomRange(-.7, -.15),
+            life: .65,
+            color: '#c8d8d6',
+            size: randomRange(2, 4.5)
+          });
+        }
+        if (stealth.timer <= 0) revealFromStealth();
+      }
+      if (monkeyClones.length) {
+        pluck.timer--;
+        const el = skills.pluck.el;
+        el.querySelector('.cd').textContent = `猴×${monkeyClones.length} · ${Math.ceil(pluck.timer / 60)}s`;
+        el.classList.add('active');
+        el.classList.remove('on-cd');
+        if (pluck.timer <= 0) {
+          for (const c of monkeyClones) createParticles(c.x, c.y, '#e8cb68', 8);
+          monkeyClones = [];
+          el.classList.remove('active');
+        }
+      } else {
+        skills.pluck.el.classList.remove('active');
       }
       if (mantle.cd > 0) mantle.cd--;
       if (mantle.active) {
@@ -2386,6 +2650,7 @@
 
     // 变身与主动避火罩提供减伤，避免永久无敌。
     function hurtPlayer(dmg) {
+      if (stealth.active) return;
       let multiplier = 1;
       if (transform.active) multiplier *= .3;
       if (mantle.active) multiplier *= .4;
@@ -2443,7 +2708,7 @@
           projectiles.splice(i, 1);
           continue;
         }
-        if (Math.hypot(p.x - player.x, p.y - player.y) < p.radius + player.r) {
+        if (!stealth.active && Math.hypot(p.x - player.x, p.y - player.y) < p.radius + player.r) {
           if (dodge.active) triggerPerfectDodge();
           else if (player.hurtCooldown <= 0) hurtPlayer(p.dmg);
           createParticles(p.x, p.y, p.color, 8);
@@ -2460,6 +2725,14 @@
           continue;
         }
         if (e.attackAnimT > 0) e.attackAnimT--;
+
+        // 聚形散气期间妖怪失去本体踪迹，不再追击或完成已经起手的攻击。
+        if (stealth.active) {
+          if (e.state === 'chase' || e.state === 'windup' || e.state === 'recover') e.state = 'idle';
+          e.lungeT = 0;
+          e.aoeT = 0;
+          continue;
+        }
 
         const dx = player.x - e.x;
         const dy = player.y - e.y;
@@ -5782,6 +6055,88 @@
       }
     }
 
+    function drawMonkeyClone(c) {
+      const sx = c.x - camera.x;
+      const sy = c.y - camera.y;
+      const attacking = c.attackTimer > 0;
+      const p = attacking ? 1 - c.attackTimer / c.attackDuration : 0;
+      const kind = c.attackKind || STANCES[stanceIdx].kind;
+      const u = 9;
+      const bob = Math.sin(c.bob) * 2;
+
+      ctx.save();
+      ctx.globalAlpha = Math.min(.82, pluck.timer / 45);
+      ctx.translate(sx, sy);
+      ctx.fillStyle = 'rgba(0,0,0,.2)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 12, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.translate(0, bob - (attacking && kind === 'vault' ? Math.sin(p * Math.PI) * 24 : 0));
+      if (attacking && kind === 'chop') ctx.rotate(p * Math.PI * 2 * CHOP_AIR_SPINS);
+      if (c.facing < 0) ctx.scale(-1, 1);
+
+      // 分身也持金箍棒，并按本体当前棍势显示挥击、竖劈或直刺。
+      const handX = u * .65;
+      const handY = -u * 2.15;
+      let staffA = -.45;
+      if (attacking) {
+        if (kind === 'chop') staffA = -.12;
+        else if (kind === 'vault') staffA = Math.PI / 2;
+        else staffA = 0;
+      }
+      ctx.save();
+      ctx.translate(handX, handY);
+      ctx.rotate(staffA);
+      ctx.shadowColor = transform.active ? '#ff7a2a' : '#f2d56e';
+      ctx.shadowBlur = attacking ? 12 : 5;
+      ctx.strokeStyle = '#704225';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-18, 0);
+      ctx.lineTo(kind === 'thrust' && attacking ? 82 : 58, 0);
+      ctx.stroke();
+      ctx.strokeStyle = '#d8b64b';
+      ctx.lineWidth = 4.5;
+      ctx.beginPath();
+      ctx.moveTo(kind === 'thrust' && attacking ? 70 : 47, 0);
+      ctx.lineTo(kind === 'thrust' && attacking ? 82 : 58, 0);
+      ctx.stroke();
+      ctx.restore();
+
+      // 小猴分身：青灰轮廓、行者短袍与金色眼睛。
+      ctx.strokeStyle = '#4d493c';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(-3, -u * 1.35);
+      ctx.lineTo(-5, -1);
+      ctx.moveTo(3, -u * 1.35);
+      ctx.lineTo(5, -1);
+      ctx.moveTo(0, -u * 2.2);
+      ctx.lineTo(handX, handY);
+      ctx.stroke();
+      ctx.fillStyle = transform.active ? '#87412c' : '#66746f';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.75, u * .72, u * .9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#8fa09a';
+      ctx.beginPath();
+      ctx.arc(0, -u * 2.8, u * .58, 0, Math.PI * 2);
+      ctx.arc(-u * .5, -u * 2.85, u * .17, 0, Math.PI * 2);
+      ctx.arc(u * .5, -u * 2.85, u * .17, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d9c09b';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 2.72, u * .38, u * .3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffe276';
+      ctx.beginPath();
+      ctx.arc(-2, -u * 2.85, 1.2, 0, Math.PI * 2);
+      ctx.arc(2, -u * 2.85, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     function drawPlayer() {
       const sx = player.x - camera.x;
       const sy = player.y - camera.y;
@@ -5936,6 +6291,9 @@
         // 角色原点上移，使臀部恰好落在竖棍顶端。
         ctx.translate(0, -pillarHeight + r * 1.42);
       }
+
+      // 隐身本体若隐若现，但蓄力光环保持清晰，玩家能看见蓄力进度。
+      if (stealth.active) ctx.globalAlpha = .18 + Math.sin(frameCount * .16) * .05;
 
       if (transform.active) {
         // 广智变身：灰狼战士（保持原来的旋转朝向画法）。
@@ -6241,13 +6599,17 @@
 
     function drawSkillFx() {
       for (const fx of skillFx) {
-        if (fx.type === 'ring') {
+        if (fx.type === 'ring' || fx.type === 'clonering') {
           const t = 1 - fx.life;
-          ctx.strokeStyle = `rgba(255, 215, 0, ${fx.life * 0.8})`;
+          ctx.strokeStyle = fx.type === 'clonering'
+            ? fx.color
+            : `rgba(255, 215, 0, ${fx.life * 0.8})`;
+          ctx.globalAlpha = fx.life * .85;
           ctx.lineWidth = 8 * fx.life + 2;
           ctx.beginPath();
-          ctx.arc(fx.x - camera.x, fx.y - camera.y, 30 + t * 180, 0, Math.PI * 2);
+          ctx.arc(fx.x - camera.x, fx.y - camera.y, 18 + t * (fx.max || 180), 0, Math.PI * 2);
           ctx.stroke();
+          ctx.globalAlpha = 1;
         } else if (fx.type === 'beam') {
           ctx.strokeStyle = `rgba(255, 120, 40, ${fx.life})`;
           ctx.lineWidth = 10 * fx.life + 3;
@@ -6285,6 +6647,20 @@
         } else if (fx.type === 'freezewave') {
           ctx.fillStyle = `rgba(150, 210, 255, ${fx.life * 0.15})`;
           ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else if (fx.type === 'cloud' || fx.type === 'cloneburst') {
+          const t = 1 - fx.life;
+          const cx = fx.x - camera.x;
+          const cy = fx.y - camera.y;
+          ctx.globalAlpha = fx.life * .7;
+          ctx.strokeStyle = fx.type === 'cloud' ? '#d7e2df' : '#f2d36b';
+          ctx.lineWidth = 3 + fx.life * 4;
+          for (let i = 0; i < (fx.type === 'cloud' ? 4 : 6); i++) {
+            const a = Math.PI * 2 * i / (fx.type === 'cloud' ? 4 : 6) + t;
+            ctx.beginPath();
+            ctx.arc(cx + Math.cos(a) * t * 42, cy + Math.sin(a) * t * 30, 12 + t * (28 + i * 3), 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
         }
       }
     }
@@ -6394,6 +6770,9 @@
       if (tudigong && introPhase !== 'walk') {
         drawList.push({ y: tudigong.y, draw: drawTudigong });
       }
+      for (const c of monkeyClones) {
+        drawList.push({ y: c.y, draw: () => drawMonkeyClone(c) });
+      }
       drawList.push({ y: player.y, draw: drawPlayer });
       drawList.sort((a, b) => a.y - b.y);
       for (const item of drawList) item.draw();
@@ -6417,7 +6796,7 @@
       while (!modalOpen && frameAccumulator >= FIXED_STEP) {
         frameCount++;
         updatePlayer(); updateStaff(); updateSkills(); updateEnemies(); updatePeaches();
-        updateBells(); updateAlly(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai();
+        updateBells(); updateAlly(); updateMonkeyClones(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai();
         updateProjectiles(); updateParticles(); updateSlashes(); updateDamageTexts();
         frameAccumulator -= FIXED_STEP;
       }
@@ -6509,7 +6888,7 @@
         return;
       }
       if (modalOpen) return;
-      if (e.repeat && ['j','J','q','Q','1','2','3','4','5','6','Shift'].includes(e.key)) return;
+      if (e.repeat && ['j','J','q','Q','1','2','3','4','5','6','7','8','Shift'].includes(e.key)) return;
       if (e.key === ' ') {
         startCharge();
       }
@@ -6522,6 +6901,8 @@
       if (e.key === '4') castTransform();
       if (e.key === '5') castPearl();
       if (e.key === '6') castMantle();
+      if (e.key === '7') castCloudStep();
+      if (e.key === '8') castPluckOfMany();
       if (e.key === 'q' || e.key === 'Q') {
         cycleStance();
       }
@@ -6631,6 +7012,8 @@
         else if (act === 'transform') castTransform();
         else if (act === 'pearl') castPearl();
         else if (act === 'mantle') castMantle();
+        else if (act === 'cloud') castCloudStep();
+        else if (act === 'pluck') castPluckOfMany();
         else if (act === 'talent') openTalentPanel(false);
         e.preventDefault();
       }, { passive: false });

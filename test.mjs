@@ -93,12 +93,36 @@ vm.runInContext(source, sandbox);
 const run = code => vm.runInContext(code, sandbox);
 
 if (run("progress.unlockedStances.join(',')") !== 'chop') throw new Error('新存档不应开局解锁全部棍式');
-if (run("progress.unlockedSkills.join(',')") !== 'freeze') throw new Error('新存档不应开局解锁全部法术');
+if (run("progress.unlockedSkills.join(',')") !== 'freeze,cloud,pluck') throw new Error('新存档应默认拥有定身、聚形散气与身外身法');
 
 run('startChapter(1)');
 if (run('player.mana !== player.maxMana || player.stamina !== player.maxStamina')) {
   throw new Error('开局没有补满法力与气力');
 }
+
+// 聚形散气期间敌人脱锁且允许蓄力，真正出棍后才显形。
+run("staff.swinging = false; staff.cooldown = 0; dodge.active = false; skills.cloud.cd = 0; player.mana = player.maxMana; enemies = [{ x:player.x + 80, y:player.y, hp:100, maxHp:100, radius:20, state:'chase', lungeT:4, aoeT:4 }]; castCloudStep();");
+if (!run('stealth.active') || run("enemies[0].state") !== 'idle' || run('enemies[0].lungeT + enemies[0].aoeT') !== 0) {
+  throw new Error('聚形散气没有进入隐身并让敌人脱锁');
+}
+run('const hiddenHp = player.hp; hurtPlayer(50); startCharge(); for (let i = 0; i < 20; i++) updatePlayer();');
+if (run('player.hp') !== run('hiddenHp') || !run('stealth.active && charge.charging && charge.level > 0')) {
+  throw new Error('隐身期间不能安全蓄力');
+}
+run('charge.level = .5; player.stamina = player.maxStamina; releaseCharge();');
+if (run('stealth.active') || !run('staff.swinging')) throw new Error('隐身重击出手后没有正常显形');
+run('staff.swinging = false; staff.cooldown = 0; staff.attack = null; charge.charging = false; enemies = [];');
+
+// 身外身法必须生成 5～6 个分身，并复制当前棍势主动攻击。
+run("skills.pluck.cd = 0; player.mana = player.maxMana; stanceIdx = 2; castPluckOfMany();");
+if (run('monkeyClones.length') < 5 || run('monkeyClones.length') > 6) throw new Error('身外身法没有召出 5～6 个分身');
+run("enemies = [{ name:'分身木桩', type:'golem', x:player.x + 90, y:player.y, hp:1000, maxHp:1000, radius:24, frozen:0, flash:0, isBoss:false }]; for (const c of monkeyClones) { c.x = player.x + 15; c.y = player.y; c.attackCd = 0; } for (let i = 0; i < 20; i++) updateMonkeyClones();");
+if (run('enemies[0].hp') >= 1000 || !run("monkeyClones.some(c => c.attackKind === 'thrust')")) {
+  throw new Error('分身没有复制戳棍并造成伤害');
+}
+run("const cloneEchoHp = enemies[0].hp; echoCloneSkill('fire');");
+if (run('enemies[0].hp') >= run('cloneEchoHp')) throw new Error('分身没有同步施放本体法术');
+run('for (const c of monkeyClones) drawMonkeyClone(c); monkeyClones = []; pluck.timer = 0; enemies = []; stanceIdx = 0; player.mana = player.maxMana; player.stamina = player.maxStamina;');
 
 // 三种重棍蓄力必须具有各自的移动规则与动作时序。
 run("staff.swinging = false; staff.cooldown = 0; dodge.active = false; dodge.cooldown = 0; stanceIdx = 0; player.x = 1000; keys['d'] = true; startCharge(); updatePlayer();");
@@ -218,4 +242,4 @@ if (!html.includes('clip-path: polygon(25% 0, 75% 0, 100% 50%') || !html.include
   throw new Error('右侧技能栏没有采用六边形蜂巢布局');
 }
 
-console.log('验收通过：右侧六边形技能栏、三棍势蓄力移动与新动作、小雷音寺四护法连战、Boss 与小怪攻击动作、三章苦海衔接、左下角三资源条、五段轻棍、移动端基础、成长奖励、土地庙、定风珠、变身平衡与本地存档均可运行。');
+console.log('验收通过：聚形散气隐身蓄力、5～6个身外身分身与技能同步、右侧六边形技能栏、三棍势蓄力移动与新动作、小雷音寺四护法连战、Boss 与小怪攻击动作、三章苦海衔接、左下角三资源条、五段轻棍、移动端基础、成长奖励、土地庙、定风珠、变身平衡与本地存档均可运行。');
