@@ -238,8 +238,8 @@ if (run('transform.active') || run('skills.transform.cd') <= 0) throw new Error(
 
 if (!storage.has('haWukongProgressV3')) throw new Error('升级进度未写入本地存档');
 if (!source.includes('FIXED_STEP') || !source.includes('frameAccumulator')) throw new Error('缺少固定时间步保护');
-if (!html.includes('clip-path: polygon(25% 0, 75% 0, 100% 50%') || !html.includes('grid-template-columns: repeat(2, 86px)')) {
-  throw new Error('右侧技能栏没有采用六边形蜂巢布局');
+if (!html.includes('border-radius: 50%') || !source.includes('Math.cos(ang)')) {
+  throw new Error('技能按钮未围绕攻击键呈半圆布局');
 }
 
-console.log('验收通过：聚形散气隐身蓄力、5～6个身外身分身与技能同步、右侧六边形技能栏、三棍势蓄力移动与新动作、小雷音寺四护法连战、Boss 与小怪攻击动作、三章苦海衔接、左下角三资源条、五段轻棍、移动端基础、成长奖励、土地庙、定风珠、变身平衡与本地存档均可运行。');
+console.log('验收通过：聚形散气隐身蓄力、5～6个身外身分身与技能同步、半圆技能键、三棍势蓄力移动与新动作、小雷音寺四护法连战、Boss 与小怪攻击动作、三章苦海衔接、左下角三资源条、五段轻棍、移动端基础、成长奖励、土地庙、定风珠、变身平衡与本地存档均可运行。');

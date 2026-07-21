@@ -35,13 +35,15 @@ with sync_playwright() as p:
           and not any("定风珠" in s for s in bar)
           and not any("避火罩" in s for s in bar), str(bar))
 
-    # 触屏按钮
-    touch_hidden = page.evaluate("""() => {
-        const b = document.querySelector('.tbtn[data-act="pearl"]');
-        const c = document.querySelector('.tbtn[data-act="cloud"]');
-        return { pearl: b.style.display, cloud: c.style.display };
-    }""")
-    check("触屏未配置按钮隐藏、已配置显示", touch_hidden["pearl"] == "none" and touch_hidden["cloud"] != "none", str(touch_hidden))
+    # 战斗键（攻击/闪避/技能圆钮）全平台可见
+    btns = page.evaluate("""() => ({
+        attack: !!document.getElementById('btn-attack'),
+        dodge: !!document.getElementById('btn-dodge'),
+        pearlHidden: document.getElementById('skill-pearl').style.display === 'none',
+        cloudShown: document.getElementById('skill-cloud').style.display !== 'none'
+    })""")
+    check("攻击/闪避键就位，未配置技能隐藏、已配置显示",
+          btns["attack"] and btns["dodge"] and btns["pearlHidden"] and btns["cloudShown"], str(btns))
 
     # 面板卡片：8 张，未解锁的禁用
     page.evaluate("openTalentPanel(true)")

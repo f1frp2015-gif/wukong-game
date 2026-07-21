@@ -62,8 +62,8 @@
 
     #player-resources {
       position: fixed;
-      left: 18px;
-      bottom: 78px;
+      left: 172px;
+      bottom: 44px;
       z-index: 4;
       width: min(310px, 34vw);
       padding: 10px 12px;
@@ -107,8 +107,8 @@
     .resource-value { text-align: right; font-variant-numeric: tabular-nums; }
 
     body.touch #player-resources {
-      left: 24px;
-      bottom: 184px;
+      left: 172px;
+      bottom: 44px;
       width: 250px;
     }
 
@@ -133,65 +133,50 @@
 
     #skill-bar {
       position: fixed;
-      top: 50%;
-      right: 18px;
-      transform: translateY(-50%);
-      display: grid;
-      grid-template-columns: repeat(2, 86px);
-      grid-auto-rows: 76px;
-      gap: 0;
+      inset: 0;
       pointer-events: none;
-      z-index: 4;
-      filter: drop-shadow(0 7px 10px rgba(0, 0, 0, 0.48));
+      z-index: 20;
     }
 
     .skill {
-      position: relative;
-      isolation: isolate;
-      width: 86px;
-      height: 76px;
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 10px 8px 8px;
-      border: 0;
-      background: linear-gradient(145deg, #f2d46a, #7d6021);
-      clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
-      font-size: 12px;
-      line-height: 1.12;
+      padding: 4px;
+      border: 1px solid rgba(212, 175, 55, 0.75);
+      background: radial-gradient(circle at 50% 32%, rgba(120, 86, 32, 0.92), rgba(12, 10, 8, 0.94));
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+      font-size: 11px;
+      line-height: 1.15;
       font-weight: 600;
       color: #e8d9a8;
       text-align: center;
       text-shadow: 0 1px 3px #000;
+      pointer-events: auto;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
     }
 
-    .skill::before {
-      content: '';
-      position: absolute;
-      inset: 2px;
-      z-index: -1;
-      background:
-        radial-gradient(circle at 50% 32%, rgba(212, 175, 55, 0.18), transparent 48%),
-        rgba(12, 10, 8, 0.9);
-      clip-path: inherit;
-    }
-
-    /* 相邻列下沉半格，组成右侧蜂巢。 */
-    .skill:nth-child(even) {
-      transform: translateY(38px);
-    }
+    /* 棍式/醒酒石/土地庙已迁入设置面板。 */
+    .skill-aux { display: none !important; }
 
     .skill .key {
       display: grid;
       place-items: center;
-      width: 24px;
-      height: 20px;
-      margin: 0 0 4px;
+      min-width: 18px;
+      height: 16px;
+      padding: 0 3px;
+      margin: 0 0 2px;
+      border-radius: 8px;
       background: #d9b84a;
       color: #1a1208;
-      clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: bold;
       text-shadow: none;
     }
@@ -203,7 +188,7 @@
       font-size: 10px;
       font-weight: bold;
       line-height: 1;
-      margin-top: 2px;
+      margin-top: 1px;
     }
 
     .skill .cd:empty { display: none; }
@@ -215,28 +200,29 @@
 
     .skill.active {
       opacity: 1;
-      background: linear-gradient(145deg, #ffe07a, #ff6a2a);
+      border-color: #ffe07a;
+      background: radial-gradient(circle at 50% 32%, rgba(190, 72, 28, 0.95), rgba(61, 21, 8, 0.95));
       color: #ffcf9a;
-      filter: drop-shadow(0 0 10px rgba(255, 122, 42, 0.82));
+      box-shadow: 0 0 14px rgba(255, 122, 42, 0.82);
     }
-
-    .skill.active::before { background: rgba(61, 21, 8, 0.9); }
 
     .skill.locked { opacity: 0.28; filter: grayscale(1); }
 
     #progress-hud {
-      position: fixed; top: 18px; right: 20px; z-index: 3;
+      position: fixed; top: 18px; right: 76px; z-index: 3;
       padding: 9px 13px; border: 1px solid rgba(212, 175, 55, 0.65);
       border-radius: 8px; background: rgba(10, 8, 6, 0.72); color: #ead58b;
       font-size: 13px; line-height: 1.55; text-align: right; pointer-events: none;
     }
 
     #objective {
-      position: fixed; top: 184px; left: 50%; z-index: 3;
+      position: fixed; top: 10px; left: 50%; z-index: 3;
       max-width: min(720px, 90vw); transform: translateX(-50%);
-      padding: 7px 14px; border-radius: 20px; background: rgba(24, 16, 10, 0.72);
-      color: #f0dfaa; font-size: 13px; text-align: center; pointer-events: none;
+      color: rgba(240, 223, 170, 0.55); font-size: 13px; text-align: center;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); pointer-events: none;
     }
+
+    h1, #score-board { display: none; }
 
     .modal {
       position: fixed; inset: 0; z-index: 40; display: none; place-items: center;
@@ -352,10 +338,6 @@
       display: block;
     }
 
-    body.touch #skill-bar {
-      display: none;
-    }
-
     /* 竖屏时提示横屏 */
     @media (orientation: portrait) {
       body.touch #rotate-tip {
@@ -407,62 +389,73 @@
       transform: translate(-50%, -50%);
     }
 
-    /* 右侧按钮区 */
-    #touch-btns {
+    /* 右下战斗键簇：攻击 + 闪避（技能按钮由 JS 排成半圆）。 */
+    .cbtn {
       position: fixed;
-      right: 14px;
-      bottom: 14px;
       z-index: 20;
-      display: grid;
-      grid-template-columns: repeat(3, 62px) 84px;
-      grid-auto-rows: 62px;
-      gap: 10px;
-      align-items: end;
-    }
-
-    .tbtn {
-      border-radius: 0;
-      background: linear-gradient(145deg, rgba(212, 175, 55, 0.72), rgba(30, 23, 13, 0.9));
-      border: 0;
-      clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+      border-radius: 50%;
+      border: 1px solid rgba(212, 175, 55, 0.75);
+      background: radial-gradient(circle at 50% 32%, rgba(120, 86, 32, 0.92), rgba(12, 10, 8, 0.94));
       color: #e8d9a8;
-      font-size: 14px;
       font-weight: bold;
-      padding: 0;
-      filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+      text-shadow: 0 1px 3px #000;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+      touch-action: manipulation;
+      user-select: none;
     }
 
-    .tbtn:active {
-      background: linear-gradient(145deg, #f3d86e, #795c1f);
-      color: #241707;
-    }
+    .cbtn:active { filter: brightness(1.35); }
 
     #btn-attack {
-      grid-row: span 2;
-      width: 84px;
-      height: 84px;
+      right: 26px;
+      bottom: 26px;
+      width: 92px;
+      height: 92px;
       font-size: 18px;
-      background: linear-gradient(145deg, rgba(235, 102, 72, 0.92), rgba(89, 24, 18, 0.94));
+      background: radial-gradient(circle at 50% 32%, rgba(235, 102, 72, 0.94), rgba(89, 24, 18, 0.95));
       color: #fff;
+    }
+
+    #btn-dodge {
+      right: 140px;
+      bottom: 32px;
+      width: 64px;
+      height: 64px;
+      font-size: 14px;
+    }
+
+    #settings-btn {
+      position: fixed;
+      right: 16px;
+      top: 16px;
+      z-index: 21;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(212, 175, 55, 0.65);
+      background: rgba(10, 8, 6, 0.78);
+      color: #ead58b;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      touch-action: manipulation;
     }
 
     /* 小屏压缩 HUD */
     @media (max-height: 500px) {
-      h1 { font-size: 16px; top: 4px; }
-      #info { display: none; }
-      #score-board { top: 30px; font-size: 14px; }
       #boss-hp { top: 76px; font-size: 13px; }
-      #skill-bar { display: none; }
-      #progress-hud { top: 6px; right: 8px; font-size: 10px; padding: 5px 8px; }
-      #objective { top: 98px; font-size: 11px; }
+      #progress-hud { top: 6px; right: 70px; font-size: 10px; padding: 5px 8px; }
+      #objective { top: 6px; font-size: 11px; }
       .modal-card { padding: 18px; }
       .talent-grid { grid-template-columns: repeat(3, 1fr); gap: 7px; }
       .talent-card { min-height: 130px; padding: 10px; }
       .talent-card b { font-size: 14px; }
       .talent-card span { font-size: 11px; }
-      #player-resources { width: 220px; padding: 6px 8px; }
+      #player-resources { width: 220px; padding: 6px 8px; left: 150px; bottom: 20px; }
       .resource-row { grid-template-columns: 32px 1fr 56px; gap: 5px; margin: 3px 0; font-size: 10px; }
-      body.touch #player-resources { bottom: 146px; left: 18px; width: 210px; }
+      body.touch #player-resources { left: 150px; bottom: 20px; width: 210px; }
+      #btn-attack { width: 76px; height: 76px; right: 18px; bottom: 18px; }
+      #btn-dodge { width: 54px; height: 54px; right: 112px; bottom: 22px; }
     }
   </style>
 </head>
@@ -486,17 +479,17 @@
   <div id="stage">
     <canvas id="game" width="800" height="600"></canvas>
     <div id="skill-bar">
-      <div class="skill"><span class="key">Q</span><span id="stance-name">劈棍</span></div>
+      <div class="skill skill-aux"><span class="key">Q</span><span id="stance-name">劈棍</span></div>
       <div class="skill" id="skill-freeze"><span class="key">1</span>定身术<span class="cd"></span></div>
       <div class="skill" id="skill-sweep"><span class="key">2</span>横扫六合<span class="cd"></span></div>
       <div class="skill" id="skill-fire"><span class="key">3</span>火眼金睛<span class="cd"></span></div>
       <div class="skill" id="skill-transform"><span class="key">4</span>广智变身<span class="cd"></span></div>
       <div class="skill" id="skill-pearl"><span class="key">5</span>定风珠<span class="cd"></span></div>
-      <div class="skill" id="slot-sober" style="visibility:hidden"><span class="key">石</span>醒酒石</div>
+      <div class="skill skill-aux" id="slot-sober" style="visibility:hidden"><span class="key">石</span>醒酒石</div>
       <div class="skill" id="skill-mantle"><span class="key">6</span>避火罩<span class="cd"></span></div>
       <div class="skill" id="skill-cloud"><span class="key">7</span>聚形散气<span class="cd"></span></div>
       <div class="skill" id="skill-pluck"><span class="key">8</span>身外身法<span class="cd"></span></div>
-      <div class="skill"><span class="key">T</span>土地庙</div>
+      <div class="skill skill-aux"><span class="key">T</span>土地庙</div>
     </div>
   </div>
 
@@ -506,22 +499,25 @@
     <div id="joy-zone">
       <div id="joy-base"><div id="joy-knob"></div></div>
     </div>
-    <div id="touch-btns">
-      <button class="tbtn" data-act="stance">棍式</button>
-      <button class="tbtn" data-act="freeze">定身</button>
-      <button class="tbtn" data-act="sweep">横扫</button>
-      <button class="tbtn" data-act="fire">火眼</button>
-      <button class="tbtn" data-act="transform">变身</button>
-      <button class="tbtn" data-act="pearl">定风</button>
-      <button class="tbtn" data-act="mantle">避火</button>
-      <button class="tbtn" data-act="cloud">隐身</button>
-      <button class="tbtn" data-act="pluck">分身</button>
-      <button class="tbtn" data-act="talent">悟道</button>
-      <button class="tbtn" data-act="map">地图</button>
-      <button class="tbtn" data-act="dodge">闪避</button>
-      <button class="tbtn" id="btn-attack">攻击</button>
-    </div>
   </div>
+
+  <button class="cbtn" id="btn-dodge">闪避</button>
+  <button class="cbtn" id="btn-attack">攻击</button>
+  <button id="settings-btn" title="设置">⚙</button>
+
+  <section id="settings-panel" class="modal">
+    <div class="modal-card">
+      <h2>设置</h2>
+      <p id="settings-res"></p>
+      <div class="menu-actions">
+        <button id="settings-stance">切换棍式</button>
+        <button id="settings-temple">土地庙悟道与配置</button>
+        <button id="settings-map">查看地图</button>
+      </div>
+      <p id="settings-sober"></p>
+      <div class="menu-actions"><button onclick="closeSettings()">继续修行</button></div>
+    </div>
+  </section>
 
   <div id="overlay">
     <h2 id="overlay-title">游戏结束</h2>
@@ -587,6 +583,7 @@
     const talentGridEl = document.getElementById('talent-grid');
     const equipGridEl = document.getElementById('equip-grid');
     const mapPanelEl = document.getElementById('map-panel');
+    const settingsPanelEl = document.getElementById('settings-panel');
     const mapBoxEl = document.getElementById('map-box');
     const mapTitleEl = document.getElementById('map-title');
     const mapTravelEl = document.getElementById('map-travel');
@@ -669,6 +666,8 @@
     let progress = loadProgress();
     let modalOpen = true;
     let talentReturnToStart = false;
+    // 设置（悟道/配置调整）每章节只开放一次。
+    let settingsUsed = false;
 
     function persistProgress() {
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch {}
@@ -777,6 +776,35 @@
     function closeMapPanel() {
       mapPanelEl.classList.remove('visible');
       modalOpen = false;
+    }
+
+    // 设置面板：棍式切换、土地庙、地图入口；每章仅一次调整机会（看地图除外）。
+    function openSettings() {
+      if (!gameRunning || startMenuEl.classList.contains('visible')) return;
+      if (settingsPanelEl.classList.contains('visible')) return;
+      if (talentPanelEl.classList.contains('visible') || mapPanelEl.classList.contains('visible')) return;
+      if (settingsUsed) {
+        banner = { text: '本章机缘已尽，下一章再来调整', timer: 110 };
+        return;
+      }
+      modalOpen = true;
+      renderSettings();
+      settingsPanelEl.classList.add('visible');
+    }
+
+    function closeSettings() {
+      if (!settingsPanelEl.classList.contains('visible')) return;
+      settingsPanelEl.classList.remove('visible');
+      settingsUsed = true;
+      modalOpen = false;
+    }
+
+    function renderSettings() {
+      document.getElementById('settings-res').textContent =
+        `灵蕴 ${progress.spirit} · 修行点 ${progress.cultivation} —— 本章仅此一次调整机会`;
+      document.getElementById('settings-stance').textContent = `棍式：${STANCES[stanceIdx].name}（点击切换）`;
+      document.getElementById('settings-sober').textContent =
+        player.hasSoberStone ? '持有【醒酒石】· 可唤醒黄风岭最右侧的黄袍员外' : '';
     }
 
     function renderMapPanel() {
@@ -941,6 +969,7 @@
 
     function startChapter(chapter) {
       if (chapter > progress.chapterUnlocked) return;
+      settingsUsed = false;
       startMenuEl.classList.remove('visible'); talentPanelEl.classList.remove('visible');
       overlay.style.display = 'none'; modalOpen = false; gameRunning = true;
       initGame(); applyPersistentState(); updateUnlockUI();
@@ -1062,18 +1091,23 @@
     function skillCooldown(skill) { return Math.round(skill.maxCd * (1 - progress.talents.spell * .1)); }
 
     function updateUnlockUI() {
-      // 已配置的法术按规范顺序占用键位 1—4；未配置的槽位与触屏按钮隐藏。
+      // 已配置的法术按规范顺序占用键位 1—4，围绕攻击键排成半圆；未配置的槽位隐藏。
       const equippedOrdered = SPELL_DEFS.filter(d => isEquipped(d.id)).map(d => d.id);
+      const atkBtn = document.getElementById('btn-attack');
+      const atkRect = atkBtn.getBoundingClientRect && atkBtn.getBoundingClientRect();
+      const cx = atkRect && atkRect.width ? atkRect.left + atkRect.width / 2 : window.innerWidth - 72;
+      const cy = atkRect && atkRect.width ? atkRect.top + atkRect.height / 2 : window.innerHeight - 72;
       for (const def of SPELL_DEFS) {
         const el = document.getElementById(`skill-${def.id}`);
         el.classList.toggle('locked', !isUnlocked(def.group, def.id));
         const slot = equippedOrdered.indexOf(def.id);
         el.style.display = slot >= 0 ? '' : 'none';
-        if (slot >= 0) el.querySelector('.key').textContent = String(slot + 1);
-      }
-      for (const btn of document.querySelectorAll('.tbtn[data-act]')) {
-        const def = spellDef(btn.dataset.act);
-        if (def) btn.style.display = isEquipped(def.id) ? '' : 'none';
+        if (slot >= 0) {
+          el.querySelector('.key').textContent = String(slot + 1);
+          const ang = (90 + slot * 25) * Math.PI / 180;
+          el.style.left = (cx + 135 * Math.cos(ang) - 32) + 'px';
+          el.style.top = (cy - 135 * Math.sin(ang) - 32) + 'px';
+        }
       }
       const available = STANCES.filter(s => isUnlocked('unlockedStances', s.kind));
       if (!available.some(s => s.kind === STANCES[stanceIdx].kind)) stanceIdx = STANCES.findIndex(s => available.some(a => a.kind === s.kind));
@@ -1457,6 +1491,7 @@
 
     // 第三章开场：雪原直路 → 遇小西天土地 → 化蝠飞往小西天。
     function startChapter3Intro() {
+      settingsUsed = false;
       setObjective('第三章 · 小西天：沿雪原前行，与小西天土地会合');
       currentMap = 'intro';
       introPhase = 'walk';
@@ -1999,7 +2034,8 @@
     }
 
     function enterHuangfeng() {
-      // 黄风岭入口即存档点。
+      // 黄风岭入口即存档点，也是新一章：重置设置调整机会。
+      settingsUsed = false;
       checkpoint = { map: 'huangfeng', bossIndex: 0 };
       progress.chapter2Checkpoint = 0;
       persistProgress();
@@ -2475,6 +2511,7 @@
       victoryCountdown = 0;
       slowMoTimer = 0;
       gustTimer = 0;
+      settingsUsed = false;
       document.getElementById('slot-sober').style.visibility = 'hidden';
       player.hasMantle = false;
       applyPersistentState();
@@ -7682,7 +7719,7 @@
       }
       if (e.key === 't' || e.key === 'T') {
         if (talentPanelEl.classList.contains('visible')) closeTalentPanel();
-        else if (!startMenuEl.classList.contains('visible')) openTalentPanel(false);
+        else if (!startMenuEl.classList.contains('visible')) openSettings();
         return;
       }
       if (e.key === 'p' || e.key === 'P') {
@@ -7801,28 +7838,55 @@
       else startSwing(1);
       e.preventDefault();
     }, { passive: false });
+    btnAttack.addEventListener('click', () => {
+      if (charge.charging) releaseCharge();
+      else startSwing(1);
+    });
 
-    // 其余功能键。
-    for (const btn of document.querySelectorAll('.tbtn[data-act]')) {
-      btn.addEventListener('touchstart', (e) => {
-        const act = btn.dataset.act;
-        if (act === 'stance') {
-          cycleStance();
-        } else if (act === 'dodge') {
-          startDodge(player.moveDx || Math.cos(player.angle), player.moveDy || Math.sin(player.angle));
-        } else if (spellDef(act)) castSpell(act);
-        else if (act === 'talent') openTalentPanel(false);
-        else if (act === 'map') openMapPanel();
-        e.preventDefault();
-      }, { passive: false });
+    // 闪避键。
+    const btnDodge = document.getElementById('btn-dodge');
+    const dodgeFromBtn = () => startDodge(player.moveDx || Math.cos(player.angle), player.moveDy || Math.sin(player.angle));
+    btnDodge.addEventListener('touchstart', (e) => {
+      dodgeFromBtn();
+      e.preventDefault();
+    }, { passive: false });
+    btnDodge.addEventListener('click', dodgeFromBtn);
+
+    // 技能按钮：点击施放（与键盘 1—4 一致）。
+    for (const def of SPELL_DEFS) {
+      const el = document.getElementById(`skill-${def.id}`);
+      el.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        castSpell(def.id);
+      });
     }
+
+    // 设置面板按钮。
+    document.getElementById('settings-btn').addEventListener('click', openSettings);
+    document.getElementById('settings-stance').addEventListener('click', () => {
+      cycleStance();
+      renderSettings();
+    });
+    document.getElementById('settings-temple').addEventListener('click', () => {
+      settingsPanelEl.classList.remove('visible');
+      settingsUsed = true;
+      openTalentPanel(false);
+    });
+    document.getElementById('settings-map').addEventListener('click', () => {
+      settingsPanelEl.classList.remove('visible');
+      modalOpen = false;
+      openMapPanel();
+    });
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     }
 
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      updateUnlockUI();
+    });
 
     resizeCanvas();
     initGame();
