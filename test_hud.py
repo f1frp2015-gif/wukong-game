@@ -37,11 +37,18 @@ with sync_playwright() as p:
     check("游戏名与得分已隐藏", st["h1"] == "none" and st["score"] == "none", str(st))
     check("章节提示在顶部且浅色半透明", st["objTop"] < 30 and "0.55" in st["objColor"], str(st))
 
-    # ---- 血条在方向区右侧 ----
-    res = page.evaluate("document.getElementById('player-resources').getBoundingClientRect().left")
-    check("血条位于方向区右侧（left≈172）", 150 <= res <= 195, str(res))
+    # ---- 血条左上角半透明缩小 ----
+    res = page.evaluate("""() => {
+        const el = document.getElementById('player-resources');
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return { left: r.left, top: r.top, width: r.width, bg: cs.backgroundColor, border: cs.borderColor };
+    }""")
+    check("血条位于左上角", res["left"] < 30 and res["top"] < 30, str(res))
+    check("血条半透明且缩小（宽≤230、底色透明）",
+          res["width"] <= 235 and "0.42" in res["bg"] and "0.3" in res["border"], str(res))
 
-    # ---- 半圆技能键 ----
+    # ---- 技能键 90° 象限均布 ----
     pos = page.evaluate("""() => {
         const atk = document.getElementById('btn-attack').getBoundingClientRect();
         const cx = atk.left + atk.width / 2, cy = atk.top + atk.height / 2;
@@ -50,13 +57,28 @@ with sync_playwright() as p:
             const el = document.getElementById(id);
             if (el.style.display === 'none') continue;
             const r = el.getBoundingClientRect();
-            out.slots.push({ id, x: r.left + r.width / 2 - cx, y: r.top + r.height / 2 - cy, w: r.width });
+            const dx = r.left + r.width / 2 - cx, dy = r.top + r.height / 2 - cy;
+            out.slots.push({ id, ang: Math.round(Math.atan2(-dy, dx) * 180 / Math.PI), r: Math.round(Math.hypot(dx, dy)) });
         }
         return out;
     }""")
-    ok_arc = len(pos["slots"]) == 3 and all(
-        110 < ((s["x"] ** 2 + s["y"] ** 2) ** 0.5) < 165 and s["y"] < 0 and s["w"] == 64 for s in pos["slots"])
-    check("已配置技能围绕攻击键呈半圆（左上弧、半径~135）", ok_arc, str(pos["slots"]))
+    angs = [s["ang"] for s in pos["slots"]]
+    radii = [s["r"] for s in pos["slots"]]
+    check("技能键角度 90° 象限均布（90/120/150）", angs == [90, 120, 150], str(pos["slots"]))
+    check("技能键半径一致（~150）", all(140 <= r <= 160 for r in radii), str(radii))
+
+    # ---- 自适应：缩小窗口后半径变小且位置更新 ----
+    page.set_viewport_size({"width": 700, "height": 480})
+    page.wait_for_timeout(300)
+    r2 = page.evaluate("""() => {
+        const atk = document.getElementById('btn-attack').getBoundingClientRect();
+        const cx = atk.left + atk.width / 2, cy = atk.top + atk.height / 2;
+        const el = document.getElementById('skill-freeze').getBoundingClientRect();
+        return Math.round(Math.hypot(el.left + el.width / 2 - cx, el.top + el.height / 2 - cy));
+    }""")
+    check("窗口缩小后半径自适应收紧", r2 <= 115, str(r2))
+    page.set_viewport_size({"width": 1280, "height": 800})
+    page.wait_for_timeout(300)
 
     # ---- 点击技能按钮施放 ----
     page.evaluate("player.mana = 100; enemies.push({type:'wolf',name:'狼妖',x:player.x+50,y:player.y,radius:20,hp:40,maxHp:40,dmg:10,speed:1.6,aggro:260,score:20,atk:'lunge',isBoss:false,state:'chase',wanderT:0,wanderA:0,windup:0,recover:0,flash:0,frozen:0,bob:0,lungeT:0,aoeT:0})")

@@ -62,15 +62,14 @@
 
     #player-resources {
       position: fixed;
-      left: 172px;
-      bottom: 44px;
+      left: 16px;
+      top: 16px;
       z-index: 4;
-      width: min(310px, 34vw);
-      padding: 10px 12px;
-      border: 1px solid rgba(212, 175, 55, 0.6);
+      width: min(230px, 30vw);
+      padding: 7px 9px;
+      border: 1px solid rgba(212, 175, 55, 0.3);
       border-radius: 10px;
-      background: rgba(10, 8, 6, 0.78);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      background: rgba(10, 8, 6, 0.42);
       pointer-events: none;
     }
 
@@ -107,9 +106,9 @@
     .resource-value { text-align: right; font-variant-numeric: tabular-nums; }
 
     body.touch #player-resources {
-      left: 172px;
-      bottom: 44px;
-      width: 250px;
+      left: 16px;
+      top: 16px;
+      width: 210px;
     }
 
     #boss-hp {
@@ -417,11 +416,11 @@
     }
 
     #btn-dodge {
-      right: 140px;
-      bottom: 32px;
-      width: 64px;
-      height: 64px;
-      font-size: 14px;
+      right: 44px;
+      bottom: 124px;
+      width: 56px;
+      height: 56px;
+      font-size: 13px;
     }
 
     #settings-btn {
@@ -451,11 +450,12 @@
       .talent-card { min-height: 130px; padding: 10px; }
       .talent-card b { font-size: 14px; }
       .talent-card span { font-size: 11px; }
-      #player-resources { width: 220px; padding: 6px 8px; left: 150px; bottom: 20px; }
+      #player-resources { width: 190px; padding: 5px 7px; left: 10px; top: 10px; }
       .resource-row { grid-template-columns: 32px 1fr 56px; gap: 5px; margin: 3px 0; font-size: 10px; }
-      body.touch #player-resources { left: 150px; bottom: 20px; width: 210px; }
+      body.touch #player-resources { left: 10px; top: 10px; width: 180px; }
       #btn-attack { width: 76px; height: 76px; right: 18px; bottom: 18px; }
-      #btn-dodge { width: 54px; height: 54px; right: 112px; bottom: 22px; }
+      #btn-dodge { width: 48px; height: 48px; right: 32px; bottom: 98px; font-size: 12px; }
+      .skill { width: 48px; height: 48px; font-size: 9px; }
     }
   </style>
 </head>
@@ -1097,6 +1097,9 @@
       const atkRect = atkBtn.getBoundingClientRect && atkBtn.getBoundingClientRect();
       const cx = atkRect && atkRect.width ? atkRect.left + atkRect.width / 2 : window.innerWidth - 72;
       const cy = atkRect && atkRect.width ? atkRect.top + atkRect.height / 2 : window.innerHeight - 72;
+      // 半径随屏幕尺寸自适应，4 个技能键在攻击键左侧 90° 象限内均匀分布。
+      const radius = Math.max(110, Math.min(150, Math.min(window.innerWidth, window.innerHeight) * 0.22));
+      const btnSize = (window.matchMedia && window.matchMedia('(max-height: 500px)').matches) ? 48 : 64;
       for (const def of SPELL_DEFS) {
         const el = document.getElementById(`skill-${def.id}`);
         el.classList.toggle('locked', !isUnlocked(def.group, def.id));
@@ -1104,9 +1107,9 @@
         el.style.display = slot >= 0 ? '' : 'none';
         if (slot >= 0) {
           el.querySelector('.key').textContent = String(slot + 1);
-          const ang = (90 + slot * 25) * Math.PI / 180;
-          el.style.left = (cx + 135 * Math.cos(ang) - 32) + 'px';
-          el.style.top = (cy - 135 * Math.sin(ang) - 32) + 'px';
+          const ang = (90 + slot * 30) * Math.PI / 180;
+          el.style.left = (cx + radius * Math.cos(ang) - btnSize / 2) + 'px';
+          el.style.top = (cy - radius * Math.sin(ang) - btnSize / 2) + 'px';
         }
       }
       const available = STANCES.filter(s => isUnlocked('unlockedStances', s.kind));
