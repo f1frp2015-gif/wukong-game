@@ -392,7 +392,7 @@
 <body>
   <h1>哈悟空</h1>
   <div id="info">
-    WASD 移动探索，空格长按蓄力、松开重击（越久伤害越高），连续点按 J / 点击使出五段轻棍，Shift 闪避<br/>
+    WASD 移动探索，空格长按蓄力、松开重击（劈棍可走位，立棍/戳棍须站定），连续点按 J / 点击使出五段轻棍，Shift 闪避<br/>
     Q 切换已解锁棍式 · 1—4 法术与变化 · 5—6 法宝 · T 土地庙悟道<br/>
     法术与变化消耗法力，轻重攻击与闪避消耗气力
   </div>
@@ -679,12 +679,14 @@
       attack: null
     };
 
-    // 棍式：劈棍过顶劈落、立棍拄棍砸落点、戳棍拧身疾刺。
+    // 棍式：劈棍腾空旋转、立棍竖棍端坐、戳棍拧身疾刺。
     const STANCES = [
       { name: '劈棍', kind: 'chop', dmg: 1.2, range: 130, arc: 0.6, cd: 24 },
       { name: '立棍', kind: 'vault', dmg: 1.5, range: 120, radius: 125, cd: 36 },
       { name: '戳棍', kind: 'thrust', dmg: 1.35, range: 195, width: 46, cd: 18 }
     ];
+    const CHOP_AIR_SPINS = 2;
+    const CHARGE_MOVE_SCALE = 0.55;
     let stanceIdx = 0;
     const stanceNameEl = document.getElementById('stance-name');
     // 轻棍五段：每段改变动作、判定、节奏与突进距离；第五段以跳劈收尾。
@@ -699,6 +701,10 @@
     const dodge = { active: false, timer: 0, duration: 10, dx: 0, dy: 0, cooldown: 0, maxCooldown: 42 };
     // 蓄力：空格长按，松开释放，最高 3 倍伤害。
     const charge = { charging: false, level: 0, max: 90 };
+
+    function chargeLocksMovement() {
+      return charge.charging && STANCES[stanceIdx].kind !== 'chop';
+    }
 
     const FREEZE_DURATION = 180;
     const skills = {
@@ -1795,7 +1801,7 @@
     }
 
     function startCharge() {
-      if (charge.charging || staff.swinging || staff.cooldown > 0 || !gameRunning || modalOpen) return;
+      if (charge.charging || staff.swinging || staff.cooldown > 0 || dodge.active || !gameRunning || modalOpen) return;
       charge.charging = true;
       charge.level = 0;
     }
@@ -1823,7 +1829,12 @@
         const stage = combo.timer > 0 ? combo.count % LIGHT_COMBO.length : 0;
         attack = { ...LIGHT_COMBO[stage], light: true, stage: stage + 1 };
       } else {
-        attack = { ...st, light: false, stage: 0, duration: 14 };
+        const timing = st.kind === 'chop'
+          ? { duration: 34, hitDelay: 28 }
+          : st.kind === 'vault'
+            ? { duration: 28, hitDelay: 20 }
+            : { duration: 20, hitDelay: 9 };
+        attack = { ...st, ...timing, light: false, stage: 0 };
       }
       const staminaCost = isLight ? attack.stamina : Math.round(10 + power * 3);
       if (!spendResource('stamina', staminaCost)) return;
@@ -1835,6 +1846,9 @@
       staff.timer = attack.duration;
       staff.cooldown = attack.cd;
       staff.power = power * (transform.active ? transform.dmgMult : 1);
+    }
+
+    function spawnStaffSlash(attack, power) {
       const slash = {
         kind: attack.kind,
         x: player.x,
@@ -1859,7 +1873,11 @@
       if (staff.cooldown > 0) staff.cooldown--;
       if (staff.swinging) {
         staff.timer--;
-        if (staff.timer === staff.duration - 4) checkAttackHits();
+        const hitDelay = staff.attack?.hitDelay ?? 4;
+        if (staff.timer === staff.duration - hitDelay) {
+          checkAttackHits();
+          spawnStaffSlash(staff.attack, staff.power);
+        }
         if (staff.timer <= 0) staff.swinging = false;
       }
       if (!staff.swinging && staff.queued && staff.cooldown <= 0) {
@@ -2213,7 +2231,7 @@
     }
 
     function startDodge(dx, dy) {
-      if (dodge.active || dodge.cooldown > 0 || !gameRunning || modalOpen) return;
+      if (dodge.active || dodge.cooldown > 0 || chargeLocksMovement() || !gameRunning || modalOpen) return;
       if (!spendResource('stamina', 24)) return;
       dodge.active = true;
       dodge.timer = dodge.duration;
@@ -2266,12 +2284,18 @@
         my = joy.dy;
       }
 
+      // 劈棍可以在蓄力时缓慢走位；立棍与戳棍必须站定蓄力。
+      if (chargeLocksMovement()) {
+        mx = 0;
+        my = 0;
+      }
+
       if (mx !== 0 || my !== 0) {
         const len = Math.hypot(mx, my);
         mx /= len;
         my /= len;
-        // 蓄力时移动变缓。
-        const spd = player.speed * (transform.active ? transform.speedMult : 1) * (charge.charging ? 0.4 : 1);
+        const chargeMove = charge.charging && STANCES[stanceIdx].kind === 'chop' ? CHARGE_MOVE_SCALE : 1;
+        const spd = player.speed * (transform.active ? transform.speedMult : 1) * chargeMove;
         player.x += mx * spd;
         player.y += my * spd;
         player.angle = Math.atan2(my, mx);
@@ -5759,6 +5783,14 @@
       ctx.save();
       ctx.translate(sx, sy);
 
+      // 重劈会腾空旋转两周；立棍蓄力时角色随竖棍升高并坐在棍顶。
+      const st = staff.swinging && staff.attack ? staff.attack : STANCES[stanceIdx];
+      const swingP = staff.swinging ? 1 - staff.timer / staff.duration : 0;
+      const heavyChopSpin = staff.swinging && st.kind === 'chop' && !st.light;
+      const airLift = heavyChopSpin ? Math.sin(Math.min(1, swingP) * Math.PI) * r * 4.5 : 0;
+      const pillarCharging = charge.charging && st.kind === 'vault' && !transform.active;
+      const pillarHeight = pillarCharging ? r * (3.4 + charge.level * 5.2) : 0;
+
       // 阴影。
       ctx.fillStyle = 'rgba(0,0,0,0.25)';
       ctx.beginPath();
@@ -5782,20 +5814,19 @@
       if (charge.charging) {
         const lv = charge.level;
         const pulse = 1 + Math.sin(frameCount * 0.3) * 0.06;
+        const auraY = pillarCharging ? -pillarHeight : -r * 1.6;
         ctx.fillStyle = `rgba(255, 215, 0, ${0.07 + lv * 0.13})`;
         ctx.beginPath();
-        ctx.arc(0, -r * 1.6, r * (1.6 + lv * 1.4) * pulse, 0, Math.PI * 2);
+        ctx.arc(0, auraY, r * (1.6 + lv * 1.4) * pulse, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = lv >= 1 ? 'rgba(255, 255, 230, 0.95)' : 'rgba(255, 215, 0, 0.55)';
         ctx.lineWidth = 2 + lv * 2;
         ctx.beginPath();
-        ctx.arc(0, -r * 1.6, r * (1.6 + lv * 1.4) * pulse, 0, Math.PI * 2);
+        ctx.arc(0, auraY, r * (1.6 + lv * 1.4) * pulse, 0, Math.PI * 2);
         ctx.stroke();
       }
 
       // 轻棍连招跟随当前段式变化；待机与重击保持当前棍式架势。
-      const st = staff.swinging && staff.attack ? staff.attack : STANCES[stanceIdx];
-      const swingP = staff.swinging ? 1 - staff.timer / staff.duration : 0;
       let rel;
       let lenVis;
       if (st.kind === 'chop') {
@@ -5812,6 +5843,50 @@
         lenVis = staff.swinging
           ? st.range * (0.3 + Math.sin(swingP * Math.PI) * 0.7)
           : st.range * 0.55;
+      }
+
+      if (heavyChopSpin) {
+        // 两道残影明确表现完整的两周空翻轨迹。
+        ctx.strokeStyle = `rgba(255, 225, 130, ${0.22 + Math.sin(swingP * Math.PI) * 0.35})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, -airLift - r * 1.7, r * 2.8, -Math.PI * 0.2, Math.PI * 1.45);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255, 255, 225, 0.28)';
+        ctx.beginPath();
+        ctx.arc(0, -airLift - r * 1.7, r * 3.35, Math.PI * 0.65, Math.PI * 2.15);
+        ctx.stroke();
+      }
+
+      if (pillarCharging) {
+        // 立棍：金箍棒从地面笔直伸展，角色的坐姿中心位于棍顶。
+        ctx.save();
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 12 + charge.level * 12;
+        ctx.strokeStyle = '#6e4426';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 8);
+        ctx.lineTo(0, -pillarHeight);
+        ctx.stroke();
+        ctx.strokeStyle = '#d4af37';
+        ctx.lineWidth = 9;
+        ctx.beginPath();
+        ctx.moveTo(0, 5);
+        ctx.lineTo(0, -7);
+        ctx.moveTo(0, -pillarHeight + 12);
+        ctx.lineTo(0, -pillarHeight);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (heavyChopSpin) {
+        ctx.translate(0, -airLift);
+        ctx.rotate(swingP * Math.PI * 2 * CHOP_AIR_SPINS);
+      } else if (pillarCharging) {
+        // 角色原点上移，使臀部恰好落在竖棍顶端。
+        ctx.translate(0, -pillarHeight + r * 1.42);
       }
 
       if (transform.active) {
@@ -5905,21 +5980,35 @@
         const shoulderY = -u * 2.75;
         const headY = -u * 3.5;
 
-        // 双腿（走动时交替迈步）。
+        // 双腿：立棍时屈膝端坐，其余状态按行走节奏迈步。
         ctx.strokeStyle = '#3d3020';
         ctx.lineWidth = u * 0.5;
         ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(-u * 0.3, hipY);
-        ctx.lineTo(-u * 0.3 + legSwing, -u * 0.15);
-        ctx.moveTo(u * 0.3, hipY);
-        ctx.lineTo(u * 0.3 - legSwing, -u * 0.15);
+        if (pillarCharging) {
+          ctx.moveTo(-u * 0.3, hipY);
+          ctx.lineTo(-u * 0.95, hipY + u * 0.35);
+          ctx.lineTo(-u * 0.62, hipY + u * 0.92);
+          ctx.moveTo(u * 0.3, hipY);
+          ctx.lineTo(u * 0.95, hipY + u * 0.35);
+          ctx.lineTo(u * 0.62, hipY + u * 0.92);
+        } else {
+          ctx.moveTo(-u * 0.3, hipY);
+          ctx.lineTo(-u * 0.3 + legSwing, -u * 0.15);
+          ctx.moveTo(u * 0.3, hipY);
+          ctx.lineTo(u * 0.3 - legSwing, -u * 0.15);
+        }
         ctx.stroke();
         // 布鞋。
         ctx.fillStyle = '#241a10';
         ctx.beginPath();
-        ctx.ellipse(-u * 0.3 + legSwing, -u * 0.1, u * 0.32, u * 0.14, 0, 0, Math.PI * 2);
-        ctx.ellipse(u * 0.3 - legSwing, -u * 0.1, u * 0.32, u * 0.14, 0, 0, Math.PI * 2);
+        if (pillarCharging) {
+          ctx.ellipse(-u * 0.62, hipY + u * 0.92, u * 0.32, u * 0.14, -0.35, 0, Math.PI * 2);
+          ctx.ellipse(u * 0.62, hipY + u * 0.92, u * 0.32, u * 0.14, 0.35, 0, Math.PI * 2);
+        } else {
+          ctx.ellipse(-u * 0.3 + legSwing, -u * 0.1, u * 0.32, u * 0.14, 0, 0, Math.PI * 2);
+          ctx.ellipse(u * 0.3 - legSwing, -u * 0.1, u * 0.32, u * 0.14, 0, 0, Math.PI * 2);
+        }
         ctx.fill();
 
         // 行者袍。
@@ -5956,9 +6045,9 @@
         let staffA;
         if (staff.swinging) {
           if (st.kind === 'chop') {
-            // 劈棍：举臂过顶劈落。
-            armA = -2.5 + swingP * 2.9;
-            staffA = armA + 0.5;
+            // 劈棍重击由身体带棍旋转两周，轻棍仍保留挥落动作。
+            armA = st.light ? -2.5 + swingP * 2.9 : -1.25;
+            staffA = st.light ? armA + 0.5 : -0.15;
           } else if (st.kind === 'vault') {
             // 立棍：拄棍向地。
             armA = 0.35;
@@ -5969,9 +6058,19 @@
             staffA = 0;
           }
         } else if (charge.charging) {
-          // 蓄力：棍举过肩，金光渐盛。
-          armA = -2.2 - charge.level * 0.5;
-          staffA = armA + 0.4;
+          if (st.kind === 'vault') {
+            // 立棍蓄力：垂手稳住竖棍，身体端坐棍顶。
+            armA = 1.45;
+            staffA = Math.PI / 2;
+          } else if (st.kind === 'thrust') {
+            // 戳棍蓄力：沉肩收棍，站定等待直刺。
+            armA = Math.PI - 0.18;
+            staffA = Math.PI + 0.04;
+          } else {
+            // 劈棍蓄力：棍举过肩，仍可缓慢走位。
+            armA = -2.2 - charge.level * 0.5;
+            staffA = armA + 0.4;
+          }
         } else {
           armA = -0.6 + armSwing * 0.5;
           staffA = -0.6 + (moving ? Math.sin(wp) * 0.1 : Math.sin(frameCount * 0.03) * 0.04);
@@ -5987,29 +6086,31 @@
         ctx.arc(handX, handY, u * 0.16, 0, Math.PI * 2);
         ctx.fill();
 
-        // 金箍棒。
-        const drawLen = Math.min(lenVis, 120);
-        ctx.save();
-        ctx.translate(handX, handY);
-        ctx.rotate(staffA);
-        if (player.empowered || (staff.swinging && staff.power > 1.4) || charge.charging) {
-          ctx.shadowColor = '#ffd700';
-          ctx.shadowBlur = staff.swinging && staff.power > 1.4 ? 24 : 14;
+        // 金箍棒；立棍蓄力的竖棍已在角色身后从地面单独绘制。
+        if (!pillarCharging) {
+          const drawLen = Math.min(lenVis, 120);
+          ctx.save();
+          ctx.translate(handX, handY);
+          ctx.rotate(staffA);
+          if (player.empowered || (staff.swinging && staff.power > 1.4) || charge.charging) {
+            ctx.shadowColor = '#ffd700';
+            ctx.shadowBlur = staff.swinging && staff.power > 1.4 ? 24 : 14;
+          }
+          ctx.strokeStyle = '#6e4426';
+          ctx.lineWidth = 5;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-drawLen * 0.3, 0);
+          ctx.lineTo(drawLen, 0);
+          ctx.stroke();
+          ctx.strokeStyle = '#b18f3a';
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          ctx.moveTo(drawLen - 11, 0);
+          ctx.lineTo(drawLen, 0);
+          ctx.stroke();
+          ctx.restore();
         }
-        ctx.strokeStyle = '#6e4426';
-        ctx.lineWidth = 5;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-drawLen * 0.3, 0);
-        ctx.lineTo(drawLen, 0);
-        ctx.stroke();
-        ctx.strokeStyle = '#b18f3a';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.moveTo(drawLen - 11, 0);
-        ctx.lineTo(drawLen, 0);
-        ctx.stroke();
-        ctx.restore();
 
         // 猴头：猴脸、双耳、金箍、双眼。
         ctx.fillStyle = '#8a6a48';
@@ -6042,7 +6143,7 @@
       if (charge.charging) {
         const bw = 54;
         const bx = sx - bw / 2;
-        const by = sy - r * 3.4;
+        const by = sy - (pillarCharging ? pillarHeight + r * 3 : r * 3.4);
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(bx - 2, by - 2, bw + 4, 10);
         ctx.fillStyle = charge.level >= 1 ? '#fff2b0' : '#ffd700';
@@ -6341,6 +6442,8 @@
     }
 
     function cycleStance() {
+      // 蓄力开始后固定当前棍势，避免绕过立棍、戳棍的定身规则。
+      if (charge.charging) return;
       let next = stanceIdx;
       do { next = (next + 1) % STANCES.length; }
       while (!isUnlocked('unlockedStances', STANCES[next].kind) && next !== stanceIdx);

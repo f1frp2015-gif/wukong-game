@@ -99,6 +99,23 @@ run('startChapter(1)');
 if (run('player.mana !== player.maxMana || player.stamina !== player.maxStamina')) {
   throw new Error('开局没有补满法力与气力');
 }
+
+// 三种重棍蓄力必须具有各自的移动规则与动作时序。
+run("staff.swinging = false; staff.cooldown = 0; dodge.active = false; dodge.cooldown = 0; stanceIdx = 0; player.x = 1000; keys['d'] = true; startCharge(); updatePlayer();");
+if (run('player.x') <= 1000 || run('chargeLocksMovement()')) throw new Error('劈棍蓄力时不能移动');
+run("charge.charging = false; staff.swinging = false; staff.cooldown = 0; stanceIdx = 1; player.x = 1000; startCharge(); updatePlayer();");
+if (run('player.x') !== 1000 || !run('chargeLocksMovement()')) throw new Error('立棍蓄力时仍能移动');
+run('const lockedStance = stanceIdx; cycleStance(); startDodge(1, 0);');
+if (run('stanceIdx') !== 1 || run('dodge.active')) throw new Error('立棍蓄力可切换棍势或闪避移动');
+run("charge.charging = false; staff.cooldown = 0; stanceIdx = 2; player.x = 1000; startCharge(); updatePlayer();");
+if (run('player.x') !== 1000 || !run('chargeLocksMovement()')) throw new Error('戳棍蓄力时仍能移动');
+run("charge.charging = false; keys['d'] = false; stanceIdx = 0; staff.swinging = false; staff.cooldown = 0; player.stamina = player.maxStamina; charge.charging = true; charge.level = .75; releaseCharge();");
+if (run('CHOP_AIR_SPINS') !== 2 || run('staff.attack.duration') !== 34 || run('staff.attack.hitDelay') !== 28) {
+  throw new Error('劈棍重击没有完整的空中两周旋转时序');
+}
+run('staff.timer = Math.round(staff.duration / 2); drawPlayer();');
+run("staff.swinging = false; staff.cooldown = 0; staff.attack = null; charge.charging = true; charge.level = .65; stanceIdx = 1; drawPlayer(); charge.charging = false; stanceIdx = 0; player.stamina = player.maxStamina;");
+
 if (run('LIGHT_COMBO.length') !== 5) throw new Error('轻棍连招不是完整五段');
 run('combo.count = 0; combo.timer = 0; staff.swinging = false; staff.cooldown = 0; staff.queued = false; startSwing(1);');
 if (run('staff.attack.stage') !== 1 || run('staff.attack.name') !== '劈棍') throw new Error('轻棍第一段启动异常');
@@ -198,4 +215,4 @@ if (run('transform.active') || run('skills.transform.cd') <= 0) throw new Error(
 if (!storage.has('haWukongProgressV3')) throw new Error('升级进度未写入本地存档');
 if (!source.includes('FIXED_STEP') || !source.includes('frameAccumulator')) throw new Error('缺少固定时间步保护');
 
-console.log('验收通过：小雷音寺四护法连战、Boss 与小怪攻击动作、三章苦海衔接、左下角三资源条、五段轻棍、移动端基础、成长奖励、土地庙、定风珠、变身平衡与本地存档均可运行。');
+console.log('验收通过：三棍势蓄力移动与新动作、小雷音寺四护法连战、Boss 与小怪攻击动作、三章苦海衔接、左下角三资源条、五段轻棍、移动端基础、成长奖励、土地庙、定风珠、变身平衡与本地存档均可运行。');
