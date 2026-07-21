@@ -63,12 +63,12 @@ with sync_playwright() as p:
     check("点击取消定身术后剩 2 个", eq == ["cloud", "pluck"] or eq == ["pluck", "cloud"], str(eq))
     page.evaluate("closeTalentPanel()")
 
-    # ---- 场景 2：全解锁存档，验证最多 4 个 + 法宝互斥 ----
+    # ---- 场景 2：全解锁存档，验证最多 3 个 + 法宝互斥 ----
     save = {
         "spirit": 999, "cultivation": 9, "chapterUnlocked": 3,
         "unlockedSkills": ["freeze", "cloud", "pluck", "sweep", "fire", "transform"],
         "unlockedRelics": ["pearl", "mantle"],
-        "equippedSpells": ["freeze", "sweep", "fire", "transform"]
+        "equippedSpells": ["freeze", "sweep", "fire"]
     }
     page.evaluate(f"localStorage.setItem('{SAVE_KEY}', '{json.dumps(save)}')")
     page.reload()
@@ -76,11 +76,11 @@ with sync_playwright() as p:
 
     page.evaluate("openTalentPanel(true)")
     page.wait_for_timeout(200)
-    # 已满 4 个，点定风珠应无效果
+    # 已满 3 个，点定风珠应无效果
     page.eval_on_selector_all("#equip-grid .talent-card", "els => els.find(e => e.querySelector('b').textContent === '定风珠').click()")
     page.wait_for_timeout(100)
     eq = page.evaluate(f"JSON.parse(localStorage.getItem('{SAVE_KEY}')).equippedSpells")
-    check("配置满 4 个时无法再加定风珠", "pearl" not in eq and len(eq) == 4, str(eq))
+    check("配置满 3 个时无法再加定风珠", "pearl" not in eq and len(eq) == 3, str(eq))
 
     # 取消火眼金睛（键位 3），再选定风珠 → 成功
     page.eval_on_selector_all("#equip-grid .talent-card", "els => els.find(e => e.querySelector('b').textContent === '火眼金睛').click()")
@@ -88,7 +88,7 @@ with sync_playwright() as p:
     page.eval_on_selector_all("#equip-grid .talent-card", "els => els.find(e => e.querySelector('b').textContent === '定风珠').click()")
     page.wait_for_timeout(100)
     eq = page.evaluate(f"JSON.parse(localStorage.getItem('{SAVE_KEY}')).equippedSpells")
-    check("取消一个后可配置定风珠", "pearl" in eq and len(eq) == 4, str(eq))
+    check("取消一个后可配置定风珠", "pearl" in eq and len(eq) == 3, str(eq))
 
     # 互斥：再点避火罩 → 定风珠被顶掉
     page.eval_on_selector_all("#equip-grid .talent-card", "els => els.find(e => e.querySelector('b').textContent === '避火罩').click()")
@@ -104,17 +104,16 @@ with sync_playwright() as p:
     check("技能栏按配置显示且键位重排",
           any(s.startswith("1") and "定身术" in s for s in bar)
           and any(s.startswith("2") and "横扫六合" in s for s in bar)
-          and any(s.startswith("3") and "广智变身" in s for s in bar)
-          and any(s.startswith("4") and "避火罩" in s for s in bar)
+          and any(s.startswith("3") and "避火罩" in s for s in bar)
           and not any("火眼金睛" in s for s in bar), str(bar))
 
     # ---- 场景 3：按键施放与未配置拦截 ----
     page.evaluate("startChapter(1)")
     page.wait_for_timeout(800)
-    page.keyboard.press("4")  # 避火罩（已配置）应触发
+    page.keyboard.press("3")  # 避火罩（已配置，键位3）应触发
     page.wait_for_timeout(100)
     mantle_state = page.evaluate("mantle.active")
-    check("按 4 施放已配置的避火罩生效", mantle_state is True, str(mantle_state))
+    check("按 3 施放已配置的避火罩生效", mantle_state is True, str(mantle_state))
 
     # 未配置的火眼金睛无法通过 castSpell 施放
     page.evaluate("castSpell('fire')")
@@ -134,7 +133,7 @@ with sync_playwright() as p:
     page.reload()
     page.wait_for_timeout(600)
     eq = page.evaluate("progress.equippedSpells")  # 迁移结果在内存中，随下次存档落盘
-    check("旧存档迁移：自动取前 4 个且不冲突", eq is not None and len(eq) == 4 and not ("pearl" in eq and "mantle" in eq), str(eq))
+    check("旧存档迁移：自动取前 3 个且不冲突", eq is not None and len(eq) == 3 and not ("pearl" in eq and "mantle" in eq), str(eq))
 
     errors_final = [e for e in errors]
     check("全程无 JS 报错", not errors_final, "; ".join(errors_final[:3]))

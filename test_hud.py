@@ -62,9 +62,17 @@ with sync_playwright() as p:
         }
         return out;
     }""")
-    angs = [s["ang"] for s in pos["slots"]]
+    angs = [abs(s["ang"]) for s in pos["slots"]]  # atan2 的 180° 会返回 -180
     radii = [s["r"] for s in pos["slots"]]
-    check("技能键角度 90° 象限均布（90/120/150）", angs == [90, 120, 150], str(pos["slots"]))
+    dodge_ang = page.evaluate("""() => {
+        const atk = document.getElementById('btn-attack').getBoundingClientRect();
+        const d = document.getElementById('btn-dodge').getBoundingClientRect();
+        const dx = d.left + d.width / 2 - (atk.left + atk.width / 2);
+        const dy = d.top + d.height / 2 - (atk.top + atk.height / 2);
+        return Math.round(Math.atan2(-dy, dx) * 180 / Math.PI);
+    }""")
+    check("技能键角度 120°~180° 均布", angs == [120, 150, 180], str(pos["slots"]))
+    check("闪避键居正上方 90°", dodge_ang == 90, str(dodge_ang))
     check("技能键半径一致（~150）", all(140 <= r <= 160 for r in radii), str(radii))
 
     # ---- 自适应：缩小窗口后半径变小且位置更新 ----

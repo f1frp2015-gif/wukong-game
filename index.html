@@ -416,8 +416,6 @@
     }
 
     #btn-dodge {
-      right: 44px;
-      bottom: 124px;
       width: 56px;
       height: 56px;
       font-size: 13px;
@@ -454,7 +452,7 @@
       .resource-row { grid-template-columns: 32px 1fr 56px; gap: 5px; margin: 3px 0; font-size: 10px; }
       body.touch #player-resources { left: 10px; top: 10px; width: 180px; }
       #btn-attack { width: 76px; height: 76px; right: 18px; bottom: 18px; }
-      #btn-dodge { width: 48px; height: 48px; right: 32px; bottom: 98px; font-size: 12px; }
+      #btn-dodge { width: 48px; height: 48px; font-size: 12px; }
       .skill { width: 48px; height: 48px; font-size: 9px; }
     }
   </style>
@@ -529,7 +527,7 @@
   <section id="start-menu" class="modal visible">
     <div class="modal-card">
       <h2>哈悟空</h2>
-      <p>从黑风山一路修行至小西天。击败强敌获得修行点，在土地庙参悟流派，并自由配置法术（至多 4 个，法宝仅能择一）。</p>
+      <p>从黑风山一路修行至小西天。击败强敌获得修行点，在土地庙参悟流派，并自由配置法术（至多 3 个，法宝仅能择一）。</p>
       <div class="menu-actions">
         <button onclick="startChapter(1)">第一章 · 黑风山</button>
         <button id="chapter2-button" onclick="startChapter(2)">第二章 · 黄风岭</button>
@@ -543,7 +541,7 @@
   <section id="talent-panel" class="modal">
     <div class="modal-card">
       <h2>土地庙 · 悟道</h2>
-      <h3 class="panel-sub">法术配置（最多 4 个，定风珠与避火罩仅可择一）</h3>
+      <h3 class="panel-sub">法术配置（最多 3 个，定风珠与避火罩仅可择一）</h3>
       <div id="equip-grid" class="talent-grid"></div>
       <h3 class="panel-sub">悟道参修</h3>
       <p id="talent-points"></p>
@@ -612,7 +610,7 @@
       { id: 'cloud', name: '聚形散气', desc: '隐去身形，可趁机蓄力', group: 'unlockedSkills' },
       { id: 'pluck', name: '身外身法', desc: '拔毫成兵，召出分身助战', group: 'unlockedSkills' }
     ];
-    const MAX_EQUIPPED = 4;
+    const MAX_EQUIPPED = 3;
     const spellDef = id => SPELL_DEFS.find(d => d.id === id);
 
     // 过滤出已解锁且合法的配置：去重、按规范顺序、消解互斥、至多 MAX_EQUIPPED 个。
@@ -1097,7 +1095,7 @@
       const atkRect = atkBtn.getBoundingClientRect && atkBtn.getBoundingClientRect();
       const cx = atkRect && atkRect.width ? atkRect.left + atkRect.width / 2 : window.innerWidth - 72;
       const cy = atkRect && atkRect.width ? atkRect.top + atkRect.height / 2 : window.innerHeight - 72;
-      // 半径随屏幕尺寸自适应，4 个技能键在攻击键左侧 90° 象限内均匀分布。
+      // 半径随屏幕尺寸自适应；闪避居正上方 90°，法术键在 120°~180° 均匀分布（闪避在内共 4 键）。
       const radius = Math.max(110, Math.min(150, Math.min(window.innerWidth, window.innerHeight) * 0.22));
       const btnSize = (window.matchMedia && window.matchMedia('(max-height: 500px)').matches) ? 48 : 64;
       for (const def of SPELL_DEFS) {
@@ -1107,11 +1105,15 @@
         el.style.display = slot >= 0 ? '' : 'none';
         if (slot >= 0) {
           el.querySelector('.key').textContent = String(slot + 1);
-          const ang = (90 + slot * 30) * Math.PI / 180;
+          const ang = (120 + slot * 30) * Math.PI / 180;
           el.style.left = (cx + radius * Math.cos(ang) - btnSize / 2) + 'px';
           el.style.top = (cy - radius * Math.sin(ang) - btnSize / 2) + 'px';
         }
       }
+      const dodgeEl = document.getElementById('btn-dodge');
+      const dodgeSize = btnSize === 48 ? 48 : 56;
+      dodgeEl.style.left = (cx + radius * Math.cos(Math.PI / 2) - dodgeSize / 2) + 'px';
+      dodgeEl.style.top = (cy - radius * Math.sin(Math.PI / 2) - dodgeSize / 2) + 'px';
       const available = STANCES.filter(s => isUnlocked('unlockedStances', s.kind));
       if (!available.some(s => s.kind === STANCES[stanceIdx].kind)) stanceIdx = STANCES.findIndex(s => available.some(a => a.kind === s.kind));
       stanceNameEl.textContent = STANCES[stanceIdx].name;
@@ -7202,9 +7204,9 @@
         const armSwing = moving ? Math.sin(wp) * 0.55 : 0;
         if (player.facing < 0) ctx.scale(-1, 1);
 
-        const hipY = -u * 1.75;
-        const shoulderY = -u * 2.75;
-        const headY = -u * 3.5;
+        const hipY = -u * 1.6;
+        const shoulderY = -u * 2.3;
+        const headY = -u * 3.15;
 
         // 双腿：立棍时屈膝端坐，其余状态按行走节奏迈步。
         ctx.strokeStyle = '#3d3020';
@@ -7338,28 +7340,28 @@
           ctx.restore();
         }
 
-        // 猴头：猴脸、双耳、金箍、双眼。
+        // 猴头（大头Q版）：猴脸、双耳、金箍、双眼。
         ctx.fillStyle = '#8a6a48';
         ctx.beginPath();
-        ctx.arc(0, headY, u * 0.52, 0, Math.PI * 2);
+        ctx.arc(0, headY, u * 1.0, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(-u * 0.48, headY, u * 0.14, 0, Math.PI * 2);
-        ctx.arc(u * 0.48, headY, u * 0.14, 0, Math.PI * 2);
+        ctx.arc(-u * 0.95, headY, u * 0.26, 0, Math.PI * 2);
+        ctx.arc(u * 0.95, headY, u * 0.26, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#d9b48c';
         ctx.beginPath();
-        ctx.ellipse(0, headY + u * 0.1, u * 0.38, u * 0.3, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, headY + u * 0.22, u * 0.72, u * 0.52, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#ffd700';
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(0, headY - u * 0.12, u * 0.5, -Math.PI * 0.82, -Math.PI * 0.18);
+        ctx.arc(0, headY - u * 0.25, u * 0.9, -Math.PI * 0.82, -Math.PI * 0.18);
         ctx.stroke();
         ctx.fillStyle = '#1a1208';
         ctx.beginPath();
-        ctx.arc(-u * 0.15, headY + u * 0.02, u * 0.06, 0, Math.PI * 2);
-        ctx.arc(u * 0.15, headY + u * 0.02, u * 0.06, 0, Math.PI * 2);
+        ctx.arc(-u * 0.3, headY + u * 0.05, u * 0.11, 0, Math.PI * 2);
+        ctx.arc(u * 0.3, headY + u * 0.05, u * 0.11, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -7731,14 +7733,14 @@
         return;
       }
       if (modalOpen) return;
-      if (e.repeat && ['j','J','q','Q','1','2','3','4','Shift'].includes(e.key)) return;
+      if (e.repeat && ['j','J','q','Q','1','2','3','Shift'].includes(e.key)) return;
       if (e.key === ' ') {
         startCharge();
       }
       if (e.key === 'j' || e.key === 'J') {
         startSwing(1);
       }
-      if (['1','2','3','4'].includes(e.key)) castEquippedSlot(Number(e.key));
+      if (['1','2','3'].includes(e.key)) castEquippedSlot(Number(e.key));
       if (e.key === 'q' || e.key === 'Q') {
         cycleStance();
       }
