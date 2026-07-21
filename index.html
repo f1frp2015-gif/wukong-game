@@ -604,6 +604,7 @@
       leiyinBossIndex: 0, completedLeiyinGuardians: false,
       unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [],
       equippedSpells: ['freeze', 'cloud', 'pluck'],
+      weaponLevel: 0, trinkets: [],
       talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false
     };
 
@@ -662,10 +663,11 @@
           unlockedSkills,
           unlockedRelics,
           equippedSpells: normalizeEquipped(equippedRaw, unlockedSkills, unlockedRelics),
+          trinkets: [...new Set(list(raw.trinkets))],
           bossRewards
         };
       } catch {
-        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [], equippedSpells: ['freeze', 'cloud', 'pluck'], bossRewards: [] };
+        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [], equippedSpells: ['freeze', 'cloud', 'pluck'], weaponLevel: 0, trinkets: [], bossRewards: [] };
       }
     }
 
@@ -696,11 +698,28 @@
     }
 
     const TALENTS = {
-      staff: { name: '棍法 · 破势', descriptions: ['蓄力与棍式伤害提升12%', '三段连击增幅提高', '满蓄力震慑普通敌人'] },
-      spell: { name: '法术 · 凝神', descriptions: ['法术冷却缩短10%', '首次击中定身目标增伤35%', '击杀返还法术5%冷却'] },
-      body: { name: '身法 · 流云', descriptions: ['生命上限增加35并缩短闪避冷却', '完美闪避回复15生命', '完美闪避后的下一击提升至2.5倍'] }
+      staff: { name: '棍法 · 破势', descriptions: ['蓄力与棍式伤害提升12%', '三段连击增幅提高', '满蓄力震慑普通敌人', '四段蓄力：蓄力可超额凝聚，威力大增'] },
+      spell: { name: '法术 · 凝神', descriptions: ['法术冷却缩短10%', '首次击中定身目标增伤35%', '击杀返还法术5%冷却', '定身目标必定暴击（1.5倍伤害）'] },
+      body: { name: '身法 · 流云', descriptions: ['生命上限增加35并缩短闪避冷却', '完美闪避回复15生命', '完美闪避后的下一击提升至2.5倍', '完美闪避令时间短暂减慢'] }
     };
-    const talentCost = rank => [120, 220, 360][rank] ?? Infinity;
+    const talentCost = rank => [120, 220, 360, 520][rank] ?? Infinity;
+
+    // 珍玩：强敌掉落的小件被动宝物，效果自动生效。
+    const TRINKETS = {
+      'jinchi-bead': { name: '金池佛珠', desc: '法力上限 +30' },
+      'heifeng-mane': { name: '黑风鬃', desc: '对 BOSS 伤害 +8%' },
+      'long-scale': { name: '亢龙鳞', desc: '气力上限 +30' },
+      'miaoyin-bell': { name: '魔音铃', desc: '生命上限 +40' },
+      'sack-shard': { name: '袋中残片', desc: '击杀回复 10 点法力' }
+    };
+    function grantTrinket(id) {
+      if (progress.trinkets.includes(id)) return;
+      progress.trinkets.push(id);
+      const t = TRINKETS[id];
+      banner = { text: `获得珍玩【${t.name}】：${t.desc}`, timer: 170 };
+      applyTalentStats(false);
+      persistProgress();
+    }
 
     function openTalentPanel(fromStart = false) {
       talentReturnToStart = fromStart;
@@ -818,18 +837,46 @@
 
     function renderTalentPanel() {
       renderEquipGrid();
-      talentPointsEl.textContent = `灵蕴 ${progress.spirit} · 修行点 ${progress.cultivation}。每次参悟消耗1修行点。`;
+      talentPointsEl.textContent = `灵蕴 ${progress.spirit} · 修行点 ${progress.cultivation}。参悟消耗1修行点，淬炼只耗灵蕴。`;
       talentGridEl.innerHTML = '';
       for (const [key, talent] of Object.entries(TALENTS)) {
         const rank = progress.talents[key];
         const cost = talentCost(rank);
         const card = document.createElement('button');
         card.className = 'talent-card';
-        card.disabled = rank >= 3 || progress.cultivation < 1 || progress.spirit < cost;
-        card.innerHTML = `<b>${talent.name} ${rank}/3</b><span>${talent.descriptions[rank] || '已参悟至圆满'}</span><small>${rank >= 3 ? '已圆满' : `消耗：${cost}灵蕴 + 1修行点`}</small>`;
+        card.disabled = rank >= 4 || progress.cultivation < 1 || progress.spirit < cost;
+        card.innerHTML = `<b>${talent.name} ${rank}/4</b><span>${talent.descriptions[rank] || '已参悟至圆满'}</span><small>${rank >= 4 ? '已圆满' : `消耗：${cost}灵蕴 + 1修行点`}</small>`;
         card.addEventListener('click', () => spendTalent(key));
         talentGridEl.appendChild(card);
       }
+      // 淬炼棍棒：灵蕴直接换取攻击成长。
+      const wlv = progress.weaponLevel || 0;
+      const wcost = weaponCost(wlv);
+      const wcard = document.createElement('button');
+      wcard.className = 'talent-card';
+      wcard.disabled = wlv >= 5 || progress.spirit < wcost;
+      wcard.innerHTML = `<b>淬炼棍棒 ${wlv}/5</b><span>${wlv >= 5 ? '神铁已成，棍势无双' : `攻击伤害提升8%（当前 +${wlv * 8}%）`}</span><small>${wlv >= 5 ? '已圆满' : `消耗：${wcost}灵蕴`}</small>`;
+      wcard.addEventListener('click', spendWeapon);
+      talentGridEl.appendChild(wcard);
+      // 珍玩收集（只读展示，效果自动生效）。
+      const owned = progress.trinkets.map(id => TRINKETS[id]?.name).filter(Boolean);
+      const tcard = document.createElement('div');
+      tcard.className = 'talent-card';
+      tcard.innerHTML = `<b>珍玩 ${owned.length}/5</b><span>${owned.length ? owned.join('、') : '击败强敌可获得珍玩'}</span><small>珍玩效果自动生效</small>`;
+      talentGridEl.appendChild(tcard);
+    }
+
+    const weaponCost = level => [100, 150, 220, 300, 400][level] ?? Infinity;
+
+    function spendWeapon() {
+      const level = progress.weaponLevel || 0;
+      const cost = weaponCost(level);
+      if (level >= 5 || progress.spirit < cost) return;
+      progress.spirit -= cost;
+      progress.weaponLevel = level + 1;
+      banner = { text: `棍棒淬炼至 ${progress.weaponLevel} 阶！攻击提升 ${progress.weaponLevel * 8}%`, timer: 130 };
+      persistProgress();
+      renderTalentPanel();
     }
 
     function renderEquipGrid() {
@@ -864,7 +911,7 @@
 
     function spendTalent(key) {
       const rank = progress.talents[key], cost = talentCost(rank);
-      if (rank >= 3 || progress.cultivation < 1 || progress.spirit < cost) return;
+      if (rank >= 4 || progress.cultivation < 1 || progress.spirit < cost) return;
       progress.spirit -= cost; progress.cultivation--; progress.talents[key]++;
       applyTalentStats(false); persistProgress(); renderTalentPanel();
     }
@@ -1001,9 +1048,9 @@
       const oldMax = player.maxHp;
       const oldMaxMana = player.maxMana;
       const oldMaxStamina = player.maxStamina;
-      player.maxHp = 300 + progress.talents.body * 35;
-      player.maxMana = 100 + progress.talents.spell * 15;
-      player.maxStamina = 100 + progress.talents.body * 10;
+      player.maxHp = 300 + progress.talents.body * 35 + (progress.trinkets.includes('miaoyin-bell') ? 40 : 0);
+      player.maxMana = 100 + progress.talents.spell * 15 + (progress.trinkets.includes('jinchi-bead') ? 30 : 0);
+      player.maxStamina = 100 + progress.talents.body * 10 + (progress.trinkets.includes('long-scale') ? 30 : 0);
       dodge.maxCooldown = Math.max(27, 42 - progress.talents.body * 5);
       if (heal) {
         player.hp = player.maxHp;
@@ -1085,6 +1132,10 @@
     let sackCountdown = 0;
     let exitSackCountdown = 0;
     let victoryCountdown = 0;
+    // 黄风阵：黄风大圣在场时周期性黄风扑面（配置定风珠可压制）。
+    let gustTimer = 0;
+    // 身法四段：完美闪避令时间短暂减慢。
+    let slowMoTimer = 0;
     let score = 0;
     let kills = 0;
     let bossActive = false;
@@ -1158,6 +1209,8 @@
       enemies.push({
         type: 'boss',
         name: '黑风大王',
+        windups: [30, 44, 26],
+        enrage: { atkCycle: ['melee', 'lunge', 'melee', 'aoe'], speedMult: 1.3 },
         x: WORLD.w - 450,
         y: 400,
         radius: 34,
@@ -1193,6 +1246,8 @@
       enemies.push({
         type: 'jinchi',
         name: '金池长老',
+        windups: [36, 24, 36],
+        enrage: { atkCycle: ['melee', 'ranged', 'ranged'], speedMult: 1.25 },
         x: WORLD.w / 2,
         y: 560,
         radius: 30,
@@ -1320,6 +1375,7 @@
       for (const b of bells) {
         if (b.swing > 0.01) b.swing *= 0.985;
       }
+      if (slowMoTimer > 0) slowMoTimer--;
       if (banner && --banner.timer <= 0) banner = null;
       if (templeCountdown > 0 && --templeCountdown === 0) enterTemple();
       if (returnCountdown > 0 && --returnCountdown === 0) exitTemple();
@@ -1348,6 +1404,8 @@
       enemies.push({
         type: 'miaoyin',
         name: '魔将妙音',
+        windups: [34, 26, 44],
+        enrage: { atkCycle: ['ranged', 'aoe', 'melee', 'aoe'], speedMult: 1.25 },
         x: WORLD.w / 2,
         y: 420,
         radius: 44,
@@ -1519,10 +1577,10 @@
 
     // 小雷音寺四护法连战：不能 → 不白 → 不净 → 不空。
     const LEIYIN_BOSSES = [
-      { type: 'buneng', name: '不能', zone: '山门雪庭', objective: '避开重拳与砸地震波', hp: 1700, dmg: 38, speed: 1.15, radius: 35, atkCycle: ['melee', 'aoe'] },
-      { type: 'bubai', name: '不白', zone: '天王殿', objective: '看清双刃连斩与骤然突进', hp: 1850, dmg: 40, speed: 1.75, radius: 31, atkCycle: ['melee', 'lunge'] },
-      { type: 'bujing', name: '不净', zone: '戒坛', objective: '绕开禅杖横扫，趁砸地后反击', hp: 2050, dmg: 43, speed: 1.25, radius: 36, atkCycle: ['aoe', 'melee', 'ranged'] },
-      { type: 'bukong', name: '不空', zone: '大雄宝殿', objective: '辨清佛珠术法与瞬身掌击', hp: 2300, dmg: 46, speed: 1.55, radius: 33, atkCycle: ['ranged', 'lunge', 'melee'] }
+      { type: 'buneng', name: '不能', zone: '山门雪庭', objective: '避开重拳与砸地震波', hp: 1700, dmg: 38, speed: 1.15, radius: 35, windups: [36, 28, 48], enrage: { atkCycle: ['aoe', 'melee', 'aoe'], speedMult: 1.3 }, atkCycle: ['melee', 'aoe'] },
+      { type: 'bubai', name: '不白', zone: '天王殿', objective: '看清双刃连斩与骤然突进', hp: 1850, dmg: 40, speed: 1.75, radius: 31, windups: [26, 34, 24], enrage: { atkCycle: ['lunge', 'melee', 'lunge'], speedMult: 1.3 }, atkCycle: ['melee', 'lunge'] },
+      { type: 'bujing', name: '不净', zone: '戒坛', objective: '绕开禅杖横扫，趁砸地后反击', hp: 2050, dmg: 43, speed: 1.25, radius: 36, windups: [40, 30, 44], enrage: { atkCycle: ['aoe', 'ranged', 'aoe'], speedMult: 1.3 }, atkCycle: ['aoe', 'melee', 'ranged'] },
+      { type: 'bukong', name: '不空', zone: '大雄宝殿', objective: '辨清佛珠术法与瞬身掌击', hp: 2300, dmg: 46, speed: 1.55, radius: 33, windups: [28, 50, 26], enrage: { atkCycle: ['lunge', 'ranged', 'melee', 'lunge'], speedMult: 1.3 }, atkCycle: ['ranged', 'lunge', 'melee'] }
     ];
 
     function spawnLeiyinBoss() {
@@ -1549,6 +1607,8 @@
         isBoss: true,
         atk: d.atkCycle[0],
         atkCycle: d.atkCycle,
+        windups: d.windups,
+        enrage: d.enrage,
         attackAlt: 0,
         heavy: false,
         lungeT: 0,
@@ -1592,6 +1652,8 @@
       sackCountdown = 0;
       exitSackCountdown = 0;
       victoryCountdown = 0;
+      slowMoTimer = 0;
+      gustTimer = 0;
       leiyinBossIdx = Math.max(0, Math.min(startIndex, LEIYIN_BOSSES.length));
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 300;
@@ -1623,6 +1685,7 @@
         type: 'huangmeiboss',
         name: enraged ? '黄眉（真身）' : '黄眉',
         enraged,
+        windups: enraged ? [26, 40, 24, 36] : [32, 46, 28, 40],
         x, y,
         radius: 36,
         hp,
@@ -1666,6 +1729,8 @@
       enemies.push({
         type: 'macaque',
         name: '赤尻马猴',
+        windups: [22, 30, 24],
+        enrage: { atkCycle: ['lunge', 'lunge', 'aoe'], speedMult: 1.3 },
         x: WORLD.w / 2,
         y: 520,
         radius: 28,
@@ -1739,6 +1804,22 @@
       spawnHuangmeiBoss(Math.max(1, huangmeiFight.savedHp), true);
     }
 
+    // 黄风阵：黄风大圣存活时黄风蔽日，风沙推移并消磨血量；配置定风珠则风平浪静。
+    function updateGust() {
+      if (currentMap !== 'huangfeng') return;
+      const hf = enemies.find(e => e.isBoss && e.type === 'huangfeng');
+      if (!hf || isEquipped('pearl')) return;
+      if (--gustTimer <= 0) {
+        gustTimer = 360;
+        const ang = Math.random() * Math.PI * 2;
+        player.x = clamp(player.x + Math.cos(ang) * 90, 40, WORLD.w - 40);
+        player.y = clamp(player.y + Math.sin(ang) * 90, 40, WORLD.h - 40);
+        if (!dodge.active && player.hurtCooldown <= 0) hurtPlayer(6);
+        createParticles(player.x, player.y, '#d8b96a', 22);
+        banner = { text: '黄风蔽日！以定风珠镇之', timer: 100 };
+      }
+    }
+
     function updateHuangmeiFight() {
       if (currentMap !== 'leiyin') return;
       // 四护法全破后，北行深入大殿触发黄眉之战。
@@ -1768,6 +1849,8 @@
       enemies.push({
         type: 'kanglong',
         name: '亢金龙',
+        windups: [28, 42, 30],
+        enrage: { atkCycle: ['lunge', 'ranged', 'melee', 'aoe'], speedMult: 1.3 },
         x: WORLD.w / 2,
         y: 520,
         radius: 34,
@@ -1823,10 +1906,10 @@
 
     // 第二章 BOSS 连战顺序：沙国王父子 → 石先锋 → 虎先锋 → 黄风大圣。
     const CHAPTER2_BOSSES = [
-      { type: 'shaguo', name: '沙国王父子', zone: '沙门村', objective: '分清父子攻势，优先打断远程施法', x: 430, y: 470, hp: 900, dmg: 26, speed: 1.4, radius: 28, aggro: 380, atkCycle: ['melee', 'ranged'] },
-      { type: 'shixian', name: '石先锋', zone: '挟魂崖', objective: '观察砸地红光，闪避冲击波后反击', x: 1940, y: 430, hp: 1100, dmg: 32, speed: 0.9, radius: 36, aggro: 380, atkCycle: ['melee', 'aoe'] },
-      { type: 'huxian', name: '虎先锋', zone: '卧虎寺', objective: '用完美闪避抓住虎先锋的收招破绽', x: 1200, y: 920, hp: 1300, dmg: 34, speed: 1.7, radius: 30, aggro: 420, atkCycle: ['melee', 'lunge'] },
-      { type: 'huangfeng', name: '黄风大圣', zone: '黄风阵', objective: '完成黄袍员外支线，以定风珠压制黄风', x: 1200, y: 360, hp: 1500, dmg: 35, speed: 1.5, radius: 32, aggro: 420, atkCycle: ['melee', 'ranged'] }
+      { type: 'shaguo', name: '沙国王父子', zone: '沙门村', objective: '分清父子攻势，优先打断远程施法', x: 430, y: 470, hp: 900, dmg: 26, speed: 1.4, radius: 28, aggro: 380, windups: [32, 40], enrage: { atkCycle: ['melee', 'ranged', 'ranged', 'lunge'] }, atkCycle: ['melee', 'ranged'] },
+      { type: 'shixian', name: '石先锋', zone: '挟魂崖', objective: '观察砸地红光，闪避冲击波后反击', x: 1940, y: 430, hp: 1100, dmg: 32, speed: 0.9, radius: 36, aggro: 380, windups: [44, 32, 52], enrage: { atkCycle: ['melee', 'aoe', 'aoe'], speedMult: 1.35 }, atkCycle: ['melee', 'aoe'] },
+      { type: 'huxian', name: '虎先锋', zone: '卧虎寺', objective: '用完美闪避抓住虎先锋的收招破绽', x: 1200, y: 920, hp: 1300, dmg: 34, speed: 1.7, radius: 30, aggro: 420, windups: [24, 38, 22], enrage: { atkCycle: ['lunge', 'melee', 'lunge', 'aoe'], speedMult: 1.35 }, atkCycle: ['melee', 'lunge'] },
+      { type: 'huangfeng', name: '黄风大圣', zone: '黄风阵', objective: '完成黄袍员外支线，以定风珠压制黄风', x: 1200, y: 360, hp: 1500, dmg: 35, speed: 1.5, radius: 32, aggro: 420, windups: [30, 48, 26, 40], enrage: { atkCycle: ['ranged', 'lunge', 'aoe', 'melee'], speedMult: 1.3 }, atkCycle: ['melee', 'ranged'] }
     ];
     let chapter2BossIdx = 0;
     let nextBossCountdown = 0;
@@ -1851,6 +1934,8 @@
         isBoss: true,
         atk: 'melee',
         atkCycle: d.atkCycle,
+        windups: d.windups,
+        enrage: d.enrage,
         attackAlt: 0,
         heavy: false,
         lungeT: 0,
@@ -1881,18 +1966,22 @@
       enemies = [];
       peaches = [];
       projectiles = [];
-      const placements = [
-        ['rat', 7], ['snake', 4], ['golem', 3]
+      // 妖群结队：鼠妖成窝、蛇鼠混杂、石精压阵。
+      const packs = [
+        ['rat', 'rat', 'snake'], ['rat', 'snake'], ['rat', 'golem'],
+        ['snake', 'snake', 'rat'], ['golem', 'rat'], ['rat', 'rat']
       ];
-      for (const [type, count] of placements) {
-        for (let i = 0; i < count; i++) {
-          let x, y;
-          do {
-            x = randomRange(120, WORLD.w - 120);
-            y = randomRange(120, WORLD.h - 120);
-          } while (Math.hypot(x - WORLD.w / 2, y - (WORLD.h - 260)) < 420
-            || Math.hypot(x - WORLD.w / 2, y - 380) < 320);
-          spawnEnemy(type, x, y);
+      for (const pack of packs) {
+        let cx, cy;
+        do {
+          cx = randomRange(160, WORLD.w - 160);
+          cy = randomRange(160, WORLD.h - 160);
+        } while (Math.hypot(cx - WORLD.w / 2, cy - (WORLD.h - 260)) < 420
+          || Math.hypot(cx - WORLD.w / 2, cy - 380) < 320);
+        for (const type of pack) {
+          spawnEnemy(type,
+            clamp(cx + randomRange(-90, 90), 60, WORLD.w - 60),
+            clamp(cy + randomRange(-90, 90), 60, WORLD.h - 60));
         }
       }
       for (let i = 0; i < 5; i++) {
@@ -1904,6 +1993,7 @@
       }
       chapter2BossIdx = Math.max(0, Math.min(startIndex, CHAPTER2_BOSSES.length - 1));
       nextBossCountdown = 0;
+      gustTimer = 0;
       spawnChapterBoss();
       // 黄袍员外（猪 NPC）守在地图最右侧，完成支线后消失。
       pigNpc = player.sahaliDone ? null : { x: WORLD.w - 180, y: WORLD.h / 2 + 100 };
@@ -1935,6 +2025,8 @@
       enemies.push({
         type: 'fuban',
         name: '蝜蝂',
+        windups: [40, 32],
+        enrage: { atkCycle: ['lunge', 'melee', 'lunge'], speedMult: 1.3 },
         x: WORLD.w / 2,
         y: 460,
         radius: 40,
@@ -2203,18 +2295,21 @@
     }
 
     function scatterWorld() {
-      // 各种小怪散布全图（离出生点远一点）。
-      const placements = [
-        ['wolf', 8], ['snake', 6], ['golem', 4]
+      // 小怪成群结队散布（离出生点远一点）：狼群、蛇窝与石精巡山，远近搭配。
+      const packs = [
+        ['wolf', 'wolf', 'snake'], ['wolf', 'wolf'], ['snake', 'snake'],
+        ['wolf', 'golem'], ['snake', 'wolf'], ['golem', 'wolf'], ['wolf', 'snake']
       ];
-      for (const [type, count] of placements) {
-        for (let i = 0; i < count; i++) {
-          let x, y;
-          do {
-            x = randomRange(120, WORLD.w - 120);
-            y = randomRange(120, WORLD.h - 120);
-          } while (Math.hypot(x - player.x, y - player.y) < 420);
-          spawnEnemy(type, x, y);
+      for (const pack of packs) {
+        let cx, cy;
+        do {
+          cx = randomRange(160, WORLD.w - 160);
+          cy = randomRange(160, WORLD.h - 160);
+        } while (Math.hypot(cx - player.x, cy - player.y) < 420);
+        for (const type of pack) {
+          spawnEnemy(type,
+            clamp(cx + randomRange(-90, 90), 60, WORLD.w - 60),
+            clamp(cy + randomRange(-90, 90), 60, WORLD.h - 60));
         }
       }
       for (let i = 0; i < 6; i++) {
@@ -2383,6 +2478,8 @@
       sackCountdown = 0;
       exitSackCountdown = 0;
       victoryCountdown = 0;
+      slowMoTimer = 0;
+      gustTimer = 0;
       document.getElementById('slot-sober').style.visibility = 'hidden';
       player.hasMantle = false;
       applyPersistentState();
@@ -2488,6 +2585,10 @@
     }
 
     function applyDamage(e, damage) {
+      damage = Math.round(damage * (1 + (progress.weaponLevel || 0) * 0.08));
+      if (e.isBoss && progress.trinkets.includes('heifeng-mane')) damage = Math.round(damage * 1.08);
+      // 法术·凝神四段：定身目标必定暴击。
+      if (e.frozen > 0 && progress.talents.spell >= 4) damage = Math.round(damage * 1.5);
       if (e.frozen > 0 && progress.talents.spell >= 2 && !e.freezeBonusUsed) {
         damage = Math.round(damage * 1.35);
         e.freezeBonusUsed = true;
@@ -2512,6 +2613,7 @@
           if (e.name === '金池长老') {
             // 击败金池长老：获得避火罩，短暂停留后回到黑风山。
             grantBossReward('jinchi', 180);
+            grantTrinket('jinchi-bead');
             unlock('unlockedSkills', 'transform', '参悟变化【广智变身】！');
             unlock('unlockedRelics', 'mantle', '获得法宝【避火罩】！');
             player.hasMantle = true;
@@ -2523,6 +2625,7 @@
           if (e.name === '黑风大王') {
             // 第一章通关：前往第二章黄风岭。
             grantBossReward('black-wind', 220);
+            grantTrinket('heifeng-mane');
             unlock('unlockedSkills', 'sweep', '参悟新法术【横扫六合】！');
             unlock('unlockedStances', 'vault', '参悟新棍式【立棍】！');
             progress.chapterUnlocked = Math.max(2, progress.chapterUnlocked);
@@ -2544,6 +2647,7 @@
           if (e.type === 'huangmeiboss') {
             // 第三章通关：黄眉伏诛，小西天重见天日。
             grantBossReward('huangmei', 450);
+            grantTrinket('sack-shard');
             bossActive = false;
             progress.completedChapter3 = true;
             huangmeiFight.phase = 4;
@@ -2619,6 +2723,7 @@
           if (e.name === '亢金龙') {
             // 亢金龙已灭，赤尻马猴现身掳人。
             grantBossReward('kangjinlong', 260);
+            grantTrinket('long-scale');
             banner = { text: '亢金龙已灭！赤尻马猴将你掳走了……', timer: 180 };
             futuCountdown = 210;
             updateUI();
@@ -2627,6 +2732,7 @@
           if (e.name === '魔将妙音') {
             // 妙音是第三章的中途守将，击败后前往苦海。
             grantBossReward('miaoyin', 360);
+            grantTrinket('miaoyin-bell');
             persistProgress();
             banner = { text: '魔将妙音已灭！浮屠界尽头通往苦海……', timer: 190 };
             kuhaiCountdown = 220;
@@ -2640,6 +2746,7 @@
         score += e.score;
         kills++;
         progress.spirit += Math.max(6, Math.round(e.score * .6));
+        if (progress.trinkets.includes('sack-shard')) player.mana = Math.min(player.maxMana, player.mana + 10);
         if (progress.talents.spell >= 3) {
           for (const skill of Object.values(skills)) skill.cd = Math.max(0, skill.cd - skill.maxCd * .05);
         }
@@ -2970,7 +3077,8 @@
 
       // 蓄力进度与吸附光点。
       if (charge.charging) {
-        charge.level = Math.min(1, charge.level + 1 / charge.max);
+        // 棍法四段：蓄力可超额凝聚（第四段，威力 +34%）。
+        charge.level = Math.min(progress.talents.staff >= 4 ? 1.34 : 1, charge.level + 1 / charge.max);
         if (frameCount % 4 === 0) {
           const a = Math.random() * Math.PI * 2;
           particles.push({
@@ -3078,6 +3186,10 @@
       createParticles(player.x, player.y, '#ffd700', 16);
       player.empowered = true;
       if (progress.talents.body >= 2) player.hp = Math.min(player.maxHp, player.hp + 15);
+      if (progress.talents.body >= 4) {
+        slowMoTimer = 90;
+        createDamageText(player.x, player.y - 84, '时缓!', '#9fd8ff');
+      }
       for (const o of enemies) {
         if (!o.isBoss) o.frozen = Math.max(o.frozen, 45);
       }
@@ -3110,6 +3222,7 @@
 
     function updateProjectiles() {
       for (let i = projectiles.length - 1; i >= 0; i--) {
+        if (slowMoTimer > 0 && frameCount % 2 === 0) break;
         const p = projectiles[i];
         p.x += p.vx;
         p.y += p.vy;
@@ -3129,7 +3242,18 @@
 
     function updateEnemies() {
       for (const e of enemies) {
+        // 时缓：妖邪每隔一帧才能行动一次。
+        if (slowMoTimer > 0 && frameCount % 2 === 0) continue;
         if (e.flash > 0) e.flash--;
+        // 血量过半狂暴：提速增伤，并切换更凶的攻击循环。
+        if (e.isBoss && !e.enraged && e.enrage && e.hp <= e.maxHp * 0.5) {
+          e.enraged = true;
+          e.speed *= e.enrage.speedMult || 1.25;
+          e.dmg = Math.round(e.dmg * (e.enrage.dmgMult || 1.15));
+          if (e.enrage.atkCycle) e.atkCycle = e.enrage.atkCycle;
+          banner = { text: `${e.name}狂暴了！`, timer: 120 };
+          createParticles(e.x, e.y - e.radius, '#ff3b30', 20);
+        }
         if (e.frozen > 0) {
           e.frozen--;
           continue;
@@ -3199,7 +3323,9 @@
             // BOSS 按序轮换招式，每第三招是大招（红光预警）。
             if (e.atkCycle) e.atk = e.atkCycle[e.attackAlt % e.atkCycle.length];
             e.heavy = e.isBoss && e.attackAlt % 3 === 0;
-            e.windup = e.heavy ? 48 : 32;
+            // 快慢刀：配置了 windups 的 BOSS 每招起手时间不一，重击按比例放慢。
+            const baseWindup = e.windups ? e.windups[e.attackAlt % e.windups.length] : 32;
+            e.windup = Math.round(e.heavy ? baseWindup * 1.5 : baseWindup);
             e.windupMax = e.windup;
             e.attackDirX = dx / (dist || 1);
             e.attackDirY = dy / (dist || 1);
@@ -7206,7 +7332,7 @@
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(bx - 2, by - 2, bw + 4, 10);
         ctx.fillStyle = charge.level >= 1 ? '#fff2b0' : '#ffd700';
-        ctx.fillRect(bx, by, bw * charge.level, 6);
+        ctx.fillRect(bx, by, bw * Math.min(1, charge.level), 6);
         ctx.strokeStyle = '#d4af37';
         ctx.lineWidth = 1;
         ctx.strokeRect(bx, by, bw, 6);
@@ -7449,7 +7575,7 @@
       while (!modalOpen && frameAccumulator >= FIXED_STEP) {
         frameCount++;
         updatePlayer(); updateStaff(); updateSkills(); updateEnemies(); updatePeaches();
-        updateBells(); updateAlly(); updateMonkeyClones(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai(); updateHuangmeiFight();
+        updateBells(); updateAlly(); updateMonkeyClones(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai(); updateHuangmeiFight(); updateGust();
         updateProjectiles(); updateParticles(); updateSlashes(); updateDamageTexts();
         frameAccumulator -= FIXED_STEP;
       }
