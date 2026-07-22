@@ -151,6 +151,11 @@ for (let stage = 2; stage <= 5; stage++) {
 if (run('staff.attack.name') !== '腾空跳劈' || run('staff.attack.kind') !== 'vault') throw new Error('轻棍终结段不是跳劈');
 run('staff.swinging = false; staff.cooldown = 0; staff.queued = false; combo.timer = 0; startSwing(1);');
 if (run('staff.attack.stage') !== 1) throw new Error('轻棍连招超时后没有重置');
+
+// 棍棒音效只在实际出手帧播放一次，不能在按键缓存或收招阶段重复触发。
+run("globalThis.staffSoundCalls = 0; playStaffHitSound = () => staffSoundCalls++; staff.swinging = false; staff.cooldown = 0; staff.queued = false; combo.timer = 0; player.stamina = player.maxStamina; startSwing(1); for (let i = 0; i < staff.duration; i++) updateStaff();");
+if (run('staffSoundCalls') !== 1) throw new Error(`棍棒敲击音效触发次数异常：${run('staffSoundCalls')}`);
+
 run("player.mana = player.maxMana; skills.freeze.cd = 0; enemies = [{ x:player.x + 10, y:player.y, hp:100, radius:20, frozen:0 }]; castFreeze();");
 if (run('player.mana') !== run('player.maxMana - 25')) throw new Error('法术没有正确消耗法力');
 if (!elements.get('player-hp-fill').style.width || !elements.get('player-mana-fill').style.width || !elements.get('player-stamina-fill').style.width) {
@@ -165,6 +170,12 @@ for (const attackType of ['melee', 'lunge', 'ranged', 'aoe']) {
   }
   run('drawEnemy(enemies[0]);');
 }
+
+// 只有 Boss 真正释放攻击时才嘶吼，小怪使用同一攻击动作时不触发。
+run("globalThis.bossRoarCalls = 0; playBossRoarSound = () => bossRoarCalls++; enemies = [{ type:'boss', name:'音效测试Boss', x:player.x + 500, y:player.y, radius:34, hp:100, maxHp:100, dmg:10, speed:1, aggro:9999, isBoss:true, atk:'melee', attackAlt:0, heavy:false, state:'windup', windup:1, windupMax:32, recover:0, flash:0, frozen:0, bob:0, attackDirX:-1, attackDirY:0, lungeT:0, aoeT:0 }]; updateEnemies(); updateEnemies();");
+if (run('bossRoarCalls') !== 1) throw new Error(`Boss 嘶吼音效触发次数异常：${run('bossRoarCalls')}`);
+run("enemies = [{ type:'wolf', name:'静音小怪', x:player.x + 500, y:player.y, radius:20, hp:100, maxHp:100, dmg:10, speed:1, aggro:9999, isBoss:false, atk:'melee', attackAlt:0, heavy:false, state:'windup', windup:1, windupMax:32, recover:0, flash:0, frozen:0, bob:0, attackDirX:-1, attackDirY:0, lungeT:0, aoeT:0 }]; updateEnemies();");
+if (run('bossRoarCalls') !== 1) throw new Error('小怪攻击错误触发了 Boss 嘶吼音效');
 
 // 所有 Boss 与小怪的角色绘制都必须接入统一攻击动作层。
 for (const [type, isBoss, radius] of [

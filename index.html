@@ -621,6 +621,117 @@
     const btnGourdEl = document.getElementById('btn-gourd');
     const gourdCountEl = document.getElementById('gourd-count');
 
+    // 战斗音效由 Web Audio 即时合成，无需额外下载音频资源。
+    // 首次点击或按键时预先解锁音频，保证移动端随后由 Boss 自动触发的声音也能播放。
+    let audioContext = null;
+    const noiseBuffers = {};
+
+    function getAudioContext() {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return null;
+      try {
+        if (!audioContext) audioContext = new AudioContextClass();
+        if (audioContext.state === 'suspended') {
+          const resumed = audioContext.resume();
+          if (resumed?.catch) resumed.catch(() => {});
+        }
+        return audioContext;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function getNoiseBuffer(audio, key, duration) {
+      if (noiseBuffers[key]) return noiseBuffers[key];
+      const buffer = audio.createBuffer(1, Math.ceil(audio.sampleRate * duration), audio.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      noiseBuffers[key] = buffer;
+      return buffer;
+    }
+
+    function playStaffHitSound() {
+      const audio = getAudioContext();
+      if (!audio) return;
+      const now = audio.currentTime + 0.005;
+      const output = audio.createGain();
+      output.gain.setValueAtTime(0.0001, now);
+      output.gain.exponentialRampToValueAtTime(0.32, now + 0.004);
+      output.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+      output.connect(audio.destination);
+
+      // 短促的木质共鸣，加一层高频碰撞声，形成棍棒敲击感。
+      const body = audio.createOscillator();
+      body.type = 'triangle';
+      body.frequency.setValueAtTime(185, now);
+      body.frequency.exponentialRampToValueAtTime(72, now + 0.11);
+      body.connect(output);
+      body.start(now);
+      body.stop(now + 0.14);
+
+      const knock = audio.createBufferSource();
+      const knockFilter = audio.createBiquadFilter();
+      const knockGain = audio.createGain();
+      knock.buffer = getNoiseBuffer(audio, 'staff', 0.12);
+      knockFilter.type = 'bandpass';
+      knockFilter.frequency.value = 1450;
+      knockFilter.Q.value = 0.75;
+      knockGain.gain.setValueAtTime(0.42, now);
+      knockGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
+      knock.connect(knockFilter);
+      knockFilter.connect(knockGain);
+      knockGain.connect(output);
+      knock.start(now);
+      knock.stop(now + 0.12);
+    }
+
+    function playBossRoarSound() {
+      const audio = getAudioContext();
+      if (!audio) return;
+      const now = audio.currentTime + 0.005;
+      const output = audio.createGain();
+      output.gain.setValueAtTime(0.0001, now);
+      output.gain.exponentialRampToValueAtTime(0.22, now + 0.045);
+      output.gain.setValueAtTime(0.18, now + 0.32);
+      output.gain.exponentialRampToValueAtTime(0.0001, now + 0.72);
+      output.connect(audio.destination);
+
+      // 低频下滑负责兽吼的胸腔感，滤波噪声负责粗粝的嘶吼质感。
+      const throat = audio.createOscillator();
+      const throatFilter = audio.createBiquadFilter();
+      throat.type = 'sawtooth';
+      throat.frequency.setValueAtTime(105, now);
+      throat.frequency.exponentialRampToValueAtTime(46, now + 0.68);
+      throatFilter.type = 'lowpass';
+      throatFilter.frequency.value = 420;
+      throat.connect(throatFilter);
+      throatFilter.connect(output);
+      throat.start(now);
+      throat.stop(now + 0.72);
+
+      const growl = audio.createBufferSource();
+      const growlFilter = audio.createBiquadFilter();
+      const growlGain = audio.createGain();
+      growl.buffer = getNoiseBuffer(audio, 'boss', 0.75);
+      growl.playbackRate.value = 0.78;
+      growlFilter.type = 'bandpass';
+      growlFilter.frequency.setValueAtTime(520, now);
+      growlFilter.frequency.exponentialRampToValueAtTime(190, now + 0.68);
+      growlFilter.Q.value = 1.1;
+      growlGain.gain.setValueAtTime(0.0001, now);
+      growlGain.gain.exponentialRampToValueAtTime(0.65, now + 0.035);
+      growlGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+      growl.connect(growlFilter);
+      growlFilter.connect(growlGain);
+      growlGain.connect(output);
+      growl.start(now);
+      growl.stop(now + 0.72);
+    }
+
+    const unlockGameAudio = () => getAudioContext();
+    window.addEventListener('pointerdown', unlockGameAudio, { passive: true });
+    window.addEventListener('keydown', unlockGameAudio);
+
     const SAVE_KEY = 'haWukongProgressV3';
     const DEFAULT_PROGRESS = {
       spirit: 0, cultivation: 0, chapterUnlocked: 1, chapter2Checkpoint: 0,
@@ -2748,6 +2859,7 @@
         staff.timer--;
         const hitDelay = staff.attack?.hitDelay ?? 4;
         if (staff.timer === staff.duration - hitDelay) {
+          playStaffHitSound();
           checkAttackHits();
           spawnStaffSlash(staff.attack, staff.power);
         }
@@ -3563,6 +3675,7 @@
             e.lastAttack = e.atk;
             e.attackAnimMax = e.atk === 'aoe' ? 26 : e.atk === 'lunge' ? 18 : 16;
             e.attackAnimT = e.attackAnimMax;
+            if (e.isBoss) playBossRoarSound();
             if (e.atk === 'ranged') {
               spawnProjectile(e);
             } else if (e.atk === 'lunge') {
