@@ -114,6 +114,22 @@ with sync_playwright() as p:
     page.wait_for_timeout(300)
     check("重进第四章按进度直达蜘蛛洞", page.evaluate("currentMap") == "zhizhudong", "")
 
+    # ---- 旧存档兼容：第三章已通关但 chapterUnlocked=3 → 自动补发第四章 ----
+    page.evaluate("""() => {
+        const legacy = { chapterUnlocked: 3, reachedKuhai: true, completedChapter3: true, bossRewards: ['huangmei'] };
+        localStorage.setItem('haWukongProgressV3', JSON.stringify(legacy));
+    }""")
+    page.reload()
+    page.wait_for_timeout(700)
+    st9 = page.evaluate("""() => ({
+        unlocked: progress.chapterUnlocked,
+        disabled: document.getElementById('chapter4-button').disabled
+    })""")
+    check("旧存档自动补发第四章解锁", st9["unlocked"] >= 4 and st9["disabled"] == False, str(st9))
+    page.evaluate("startChapter(4)")
+    page.wait_for_timeout(300)
+    check("旧存档可进入兰喜村", page.evaluate("currentMap") == "lanxi", "")
+
     check("全程无 JS 报错", not errors, "; ".join(errors[:3]))
     browser.close()
 

@@ -674,14 +674,19 @@
         const unlockedRelics = [...new Set(list(raw.unlockedRelics))];
         // 旧存档没有配置字段时，按规范顺序取前 4 个已解锁法术作为默认配置。
         const equippedRaw = Array.isArray(raw.equippedSpells) ? raw.equippedSpells : [...unlockedSkills, ...unlockedRelics];
+        // 第四章开放前已通关第三章的旧存档：按通关记录补发第四章解锁。
+        const completedChapter3 = raw.reachedKuhai
+          ? Boolean(raw.completedChapter3 || bossRewards.includes('huangmei')) : false;
+        const chapterUnlocked = Math.max(raw.chapterUnlocked || 1, completedChapter3 ? 4 : 1);
         return {
           ...DEFAULT_PROGRESS, ...raw,
+          chapterUnlocked,
           reachedKuhai,
           reachedLeiyin,
           leiyinBossIndex: Math.max(raw.leiyinBossIndex || 0, defeatedGuardians),
           completedLeiyinGuardians: Boolean(raw.completedLeiyinGuardians || defeatedGuardians === guardianIds.length),
           chapter3Checkpoint: raw.chapter3Checkpoint || (reachedLeiyin ? 'leiyin' : reachedKuhai ? 'kuhai' : 'intro'),
-          completedChapter3: raw.reachedKuhai ? Boolean(raw.completedChapter3) : false,
+          completedChapter3,
           talents: { ...DEFAULT_PROGRESS.talents, ...(raw.talents || {}) },
           unlockedStances: [...new Set(['chop', ...list(raw.unlockedStances)])],
           unlockedSkills,
