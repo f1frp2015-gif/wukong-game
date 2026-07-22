@@ -37,25 +37,28 @@ with sync_playwright() as p:
         banner: banner ? banner.text : '',
         checkpoint: checkpoint ? checkpoint.map : null
     })""")
-    check("进入兰喜村", st["map"] == "lanxi" and st["phase"] == "walk", str(st))
+    check("进入兰喜村", st["map"] == "lanxi" and st["phase"] == "fight", str(st))
     check("猪八戒 ally 在场", st["ally"] == "bajie", str(st))
     check("第四章伤害 +30", st["bonus"] == 30, str(st))
     check("存档点为兰喜村", st["checkpoint"] == "lanxi", str(st))
 
-    # ---- 猪八戒跟随玩家 ----
-    page.evaluate("ally.x = player.x - 400; ally.y = player.y + 40")
-    page.evaluate("for (let i = 0; i < 90; i++) updateAlly()")
-    follow = page.evaluate("Math.abs(ally.x - (player.x - 90)) < 100")
-    check("无战事时猪八戒跟随天命人", follow, "")
-
-    # ---- 北行触发二姐 ----
-    page.evaluate("player.y = 600; updateLanxi()")
+    # ---- 二姐立即现身（刷新后 BOSS 必现）----
     boss = page.evaluate("""() => {
         const b = enemies.find(e => e.isBoss);
         return b ? { name: b.name, hp: b.maxHp, spider: b.spiderForm } : null;
     }""")
-    check("二姐现身（血量 2600+300）", boss and boss["name"] == "二姐" and boss["hp"] == 2900, str(boss))
+    check("二姐立即现身（血量 2600+300）", boss and boss["name"] == "二姐" and boss["hp"] == 2900, str(boss))
     check("初始为人形", boss and boss["spider"] == False, "")
+
+    # ---- 猪八戒跟随玩家（暂时掩藏 BOSS 验证跟随逻辑）----
+    page.evaluate("""() => {
+        window.__savedEnemies = enemies; enemies = [];
+        ally.x = player.x - 400; ally.y = player.y + 40;
+        for (let i = 0; i < 90; i++) updateAlly();
+    }""")
+    follow = page.evaluate("Math.abs(ally.x - (player.x - 90)) < 100")
+    check("无战事时猪八戒跟随天命人", follow, "")
+    page.evaluate("enemies = window.__savedEnemies;")
 
     # ---- 猪八戒协战伤敌 ----
     page.evaluate("""() => {
@@ -109,10 +112,17 @@ with sync_playwright() as p:
     defs = page.evaluate("Boolean(MAP_DEFS.lanxi && MAP_DEFS.zhizhudong)")
     check("MAP_DEFS 收录第四章两张地图", defs, "")
 
-    # ---- 重进第四章直达蜘蛛洞 ----
+    # ---- 刷新后重进第四章：回兰喜村、二姐重新出现（蜘蛛洞不作持久落点）----
+    page.reload()
+    page.wait_for_timeout(700)
     page.evaluate("startChapter(4)")
-    page.wait_for_timeout(300)
-    check("重进第四章按进度直达蜘蛛洞", page.evaluate("currentMap") == "zhizhudong", "")
+    page.wait_for_timeout(400)
+    st10 = page.evaluate("""() => ({
+        map: currentMap,
+        boss: enemies.filter(e => e.isBoss).map(e => e.name)
+    })""")
+    check("刷新后重进第四章回兰喜村", st10["map"] == "lanxi", str(st10))
+    check("二姐重新出现", "二姐" in st10["boss"], str(st10))
 
     # ---- 旧存档兼容：第三章已通关但 chapterUnlocked=3 → 自动补发第四章 ----
     page.evaluate("""() => {
@@ -128,7 +138,12 @@ with sync_playwright() as p:
     check("旧存档自动补发第四章解锁", st9["unlocked"] >= 4 and st9["disabled"] == False, str(st9))
     page.evaluate("startChapter(4)")
     page.wait_for_timeout(300)
-    check("旧存档可进入兰喜村", page.evaluate("currentMap") == "lanxi", "")
+    st11 = page.evaluate("""() => ({
+        map: currentMap,
+        boss: enemies.filter(e => e.isBoss).map(e => e.name)
+    })""")
+    check("旧存档可进入兰喜村", st11["map"] == "lanxi", str(st11))
+    check("旧存档二姐同样立即现身", "二姐" in st11["boss"], str(st11))
 
     check("全程无 JS 报错", not errors, "; ".join(errors[:3]))
     browser.close()

@@ -866,6 +866,7 @@
       spirit: 0, cultivation: 0, chapterUnlocked: 1, chapter2Checkpoint: 0,
       chapter3Checkpoint: 'intro', reachedKuhai: false, reachedLeiyin: false,
       leiyinBossIndex: 0, completedLeiyinGuardians: false,
+      reachedFutu: false, reachedIcelake: false,
       unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [],
       equippedSpells: ['freeze', 'cloud', 'pluck'],
       weaponLevel: 0, trinkets: [], damageBonus: 0,
@@ -928,6 +929,10 @@
           completedLeiyinGuardians: Boolean(raw.completedLeiyinGuardians || defeatedGuardians === guardianIds.length),
           chapter3Checkpoint: raw.chapter3Checkpoint || (reachedLeiyin ? 'leiyin' : reachedKuhai ? 'kuhai' : 'intro'),
           completedChapter3,
+          reachedFutu: Boolean(raw.reachedFutu),
+          reachedIcelake: Boolean(raw.reachedIcelake),
+          // 蜘蛛洞不作持久落点：刷新一律回兰喜村，保证二姐（BOSS）重新出现。
+          reachedZhizhudong: false,
           talents: { ...DEFAULT_PROGRESS.talents, ...(raw.talents || {}) },
           unlockedStances: [...new Set(['chop', ...list(raw.unlockedStances)])],
           unlockedSkills,
@@ -1265,10 +1270,12 @@
       } else if (chapter === 3) {
         if (progress.chapter3Checkpoint === 'leiyin' || progress.reachedLeiyin) setupLeiyin(progress.leiyinBossIndex || 0);
         else if (progress.chapter3Checkpoint === 'kuhai' || progress.reachedKuhai) enterKuhai();
+        else if (progress.reachedFutu) enterFutu();
+        else if (progress.reachedIcelake) enterIcelake();
         else startChapter3Intro();
       } else if (chapter === 4) {
-        if (progress.reachedZhizhudong) enterZhizhudong();
-        else startChapter4Intro();
+        // 刷新一律从兰喜村开打，保证二姐（BOSS）重新出现；蜘蛛洞不作持久落点。
+        startChapter4Intro();
       }
       if (chapter >= 2) grantChapterGrowth(chapter);
     }
@@ -1772,6 +1779,8 @@
       projectiles = [];
       huangmei = null;
       checkpoint = { map: 'futu' };
+      progress.reachedFutu = true;
+      persistProgress();
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 260;
       refillResources();
@@ -1844,9 +1853,13 @@
       player.y = WORLD.h - 260;
       refillResources();
       huangmei = { x: WORLD.w / 2, y: 360 };
-      icelakePhase = 'arrive';
-      icelakeTimer = 150;
-      banner = { text: '小西天 · 冰湖（存档点）', timer: 150 };
+      // 刷新/复活再来冰湖时快进前奏，亢金龙尽快重新现身。
+      const resumed = Boolean(progress.reachedIcelake);
+      progress.reachedIcelake = true;
+      persistProgress();
+      icelakePhase = resumed ? 'summon' : 'arrive';
+      icelakeTimer = resumed ? 100 : 150;
+      banner = { text: resumed ? '冰湖再战：亢金龙即将现身！' : '小西天 · 冰湖（存档点）', timer: 150 };
       updateUI();
     }
 
@@ -1974,6 +1987,11 @@
       checkpoint = { map: 'leiyin', bossIndex: leiyinBossIdx };
       banner = { text: '第三章 · 小雷音寺', timer: 190 };
       spawnLeiyinBoss();
+      // 四护法已破而黄眉未诛：重来/神行抵达时黄眉直接现身，保证 BOSS 必现。
+      if (leiyinBossIdx >= LEIYIN_BOSSES.length && progress.completedLeiyinGuardians && !progress.completedChapter3) {
+        huangmeiFight.phase = 1;
+        spawnHuangmeiBoss(2600, false);
+      }
       grantChapterGrowth(3);
     }
 
@@ -1985,7 +2003,7 @@
     function startChapter4Intro() {
       settingsUsed = false;
       currentMap = 'lanxi';
-      lanxiPhase = 'walk';
+      lanxiPhase = 'fight';
       dragCountdown = 0;
       enemies = [];
       peaches = [];
@@ -2011,10 +2029,9 @@
         noBar: true,
         attackCd: 0
       };
-      setObjective('第四章 · 兰喜村：与猪八戒一同北行，探查村中妖气');
-      banner = { text: '第四章 · 兰喜村', timer: 170 };
       grantChapterGrowth(4);
-      updateUI();
+      // 二姐立即现身（内含目标与横幅）：刷新/重进第四章时 BOSS 必现。
+      spawnErjie();
     }
 
     function spawnErjie() {
@@ -2058,13 +2075,9 @@
       updateUI();
     }
 
-    // 兰喜村剧情：北行触发二姐现身；二姐亡后垂死拖人入洞。
+    // 兰喜村剧情：二姐亡后垂死拖人入洞。
     function updateLanxi() {
       if (currentMap !== 'lanxi') return;
-      if (lanxiPhase === 'walk' && player.y < 640) {
-        lanxiPhase = 'fight';
-        spawnErjie();
-      }
       if (dragCountdown > 0 && --dragCountdown <= 0) enterZhizhudong();
     }
 
@@ -2367,6 +2380,7 @@
       enemies = [];
       peaches = [];
       projectiles = [];
+      ally = null;
       // 妖群结队：鼠妖成窝、蛇鼠混杂、石精压阵。
       const packs = [
         ['rat', 'rat', 'snake'], ['rat', 'snake'], ['rat', 'golem'],
@@ -8577,7 +8591,8 @@
 
     function restartGame() {
       // 有存档点则于存档点复活，否则从头开始。
-      if (checkpoint && checkpoint.map === 'huangfeng' && currentMap === 'huangfeng') {
+      // 斯哈里国阵亡同样回黄风岭存档点（原先会错误地掉回第一章）。
+      if (checkpoint && checkpoint.map === 'huangfeng' && (currentMap === 'huangfeng' || currentMap === 'sahali')) {
         lastFrameTime = 0; frameAccumulator = 0;
         respawnAtCheckpoint();
         return;

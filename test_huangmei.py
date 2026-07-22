@@ -40,15 +40,10 @@ with sync_playwright() as p:
     page.goto(URL)
     page.wait_for_timeout(600)
     seed(page)
+    # 四护法已破的存档重进：黄眉立即现身（保证刷新后 BOSS 必现）
     cm = page.evaluate("currentMap")
-    guardians = page.evaluate("enemies.filter(e => e.isBoss).length")
-    check("雷音寺开局（四护法已破，无BOSS）", cm == "leiyin" and guardians == 0, f"{cm} bosses={guardians}")
-
-    # 北行触发一阶段
-    page.evaluate("player.y = 700")
-    page.wait_for_timeout(400)
-    hm = page.evaluate("({ n: enemies.filter(e => e.type === 'huangmeiboss').length, phase: huangmeiFight.phase })")
-    check("北行触发黄眉一阶段", hm["n"] == 1 and hm["phase"] == 1, str(hm))
+    hm0 = page.evaluate("({ n: enemies.filter(e => e.type === 'huangmeiboss').length, phase: huangmeiFight.phase })")
+    check("雷音寺开局黄眉立即现身（一阶段）", cm == "leiyin" and hm0["n"] == 1 and hm0["phase"] == 1, f"{cm} {hm0}")
     boss_bar = page.evaluate("document.getElementById('boss-hp').style.display")
     check("BOSS 血条显示", boss_bar != "none", boss_bar)
 
@@ -109,13 +104,9 @@ with sync_playwright() as p:
     page.evaluate("gameOver(false); restartGame()")
     page.wait_for_timeout(600)
     st = page.evaluate("({ cm: currentMap, phase: huangmeiFight.phase, running: gameRunning })")
-    check("袋中死亡 → 雷音寺复活、黄眉战重置", st["cm"] == "leiyin" and st["phase"] == 0 and st["running"], str(st))
-    lose_text = page.evaluate("document.getElementById('overlay-msg').textContent")
-    # restartGame 后 overlay 已隐藏，文本是上次的；检触发文案含小雷音寺
-    page.evaluate("player.y = 700")
-    page.wait_for_timeout(400)
+    check("袋中死亡 → 雷音寺复活、黄眉直接现身再战", st["cm"] == "leiyin" and st["phase"] == 1 and st["running"], str(st))
     hm = page.evaluate("enemies.filter(e => e.type === 'huangmeiboss').length")
-    check("复活后北行可重新触发黄眉", hm == 1, str(hm))
+    check("复活后黄眉已现身（无需步行触发）", hm == 1, str(hm))
 
     check("全程无 JS 报错", not errors, "; ".join(errors[:3]))
     browser.close()
