@@ -685,47 +685,107 @@
       knock.stop(now + 0.12);
     }
 
-    function playBossRoarSound() {
+    // 每类 Boss 都有自己的声纹；数值依次控制基频、尾音、噪声频段、时长、波形与泛音。
+    const BOSS_SOUND_PROFILES = {
+      boss:          { base: 92,  end: 38,  noise: 360, duration: .78, wave: 'sawtooth', harmonic: 1.48, roughness: .72 }, // 黑风大王：厚重熊吼
+      jinchi:        { base: 126, end: 58,  noise: 620, duration: .92, wave: 'triangle', harmonic: 2.05, roughness: .38 }, // 金池长老：空洞长吟
+      shaguo:        { base: 142, end: 66,  noise: 780, duration: .62, wave: 'square',   harmonic: 1.26, roughness: .56 }, // 沙国王父子：一高一低双声
+      shixian:       { base: 68,  end: 30,  noise: 220, duration: .86, wave: 'square',   harmonic: 1.72, roughness: .82 }, // 石先锋：石块轰鸣
+      huxian:        { base: 164, end: 54,  noise: 980, duration: .55, wave: 'sawtooth', harmonic: 1.90, roughness: .68 }, // 虎先锋：短促虎啸
+      huangfeng:     { base: 118, end: 48,  noise: 1450,duration: .84, wave: 'triangle', harmonic: 2.42, roughness: .88 }, // 黄风大圣：风沙尖啸
+      fuban:         { base: 76,  end: 42,  noise: 1080,duration: .70, wave: 'square',   harmonic: 3.08, roughness: .48 }, // 蝜蝂：甲虫振翅
+      miaoyin:       { base: 110, end: 82,  noise: 460, duration: 1.02,wave: 'sine',     harmonic: 2.98, roughness: .30 }, // 魔将妙音：低沉共鸣
+      kanglong:      { base: 188, end: 72,  noise: 1320,duration: .90, wave: 'sawtooth', harmonic: 2.28, roughness: .62 }, // 亢金龙：高亢龙吟
+      buneng:        { base: 72,  end: 34,  noise: 280, duration: .72, wave: 'triangle', harmonic: 1.62, roughness: .58 }, // 不能：沉重闷吼
+      bubai:         { base: 174, end: 76,  noise: 1120,duration: .48, wave: 'square',   harmonic: 2.18, roughness: .54 }, // 不白：锐利战吼
+      bujing:        { base: 96,  end: 52,  noise: 540, duration: .88, wave: 'triangle', harmonic: 2.72, roughness: .46 }, // 不净：禅杖般浑厚
+      bukong:        { base: 136, end: 92,  noise: 860, duration: .76, wave: 'sine',     harmonic: 3.34, roughness: .36 }, // 不空：诡异气声
+      huangmeiboss:  { base: 104, end: 44,  noise: 700, duration: .98, wave: 'sawtooth', harmonic: 2.56, roughness: .76 }, // 黄眉：悠长妖笑般嘶吼
+      macaque:       { base: 206, end: 88,  noise: 1260,duration: .46, wave: 'square',   harmonic: 1.84, roughness: .64 }, // 赤尻马猴：尖锐猿啸
+      erjie:         { base: 152, end: 96,  noise: 1760,duration: .80, wave: 'triangle', harmonic: 3.72, roughness: .90 }  // 二姐：蜘蛛嘶鸣
+    };
+
+    function getBossSoundProfile(boss) {
+      const source = BOSS_SOUND_PROFILES[boss.type];
+      if (source) return source;
+      // 后续新增 Boss 即使尚未显式配置，也会根据类型名得到稳定且不同的声纹。
+      const key = boss.type || boss.name || 'unknown';
+      let hash = 0;
+      for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+      return {
+        base: 82 + hash % 92,
+        end: 34 + hash % 48,
+        noise: 360 + hash % 1200,
+        duration: .58 + (hash % 38) / 100,
+        wave: ['sawtooth', 'triangle', 'square'][hash % 3],
+        harmonic: 1.4 + (hash % 190) / 100,
+        roughness: .4 + (hash % 48) / 100
+      };
+    }
+
+    function playBossRoarSound(boss) {
       const audio = getAudioContext();
       if (!audio) return;
       const now = audio.currentTime + 0.005;
+      const profile = getBossSoundProfile(boss);
+      const attackPitch = boss.atk === 'ranged' ? 1.18 : boss.atk === 'lunge' ? 1.1 : boss.atk === 'aoe' ? .82 : 1;
+      const attackLength = boss.atk === 'aoe' ? 1.18 : boss.atk === 'lunge' ? .82 : 1;
+      const attackNoise = boss.atk === 'ranged' ? 1.32 : boss.atk === 'aoe' ? .72 : 1;
+      const heavyPitch = boss.heavy ? .82 : 1;
+      const cycleVariation = 1 + ((boss.attackAlt || 0) % 3 - 1) * .025;
+      const pitch = attackPitch * heavyPitch * cycleVariation;
+      const duration = profile.duration * attackLength * (boss.heavy ? 1.12 : 1);
       const output = audio.createGain();
       output.gain.setValueAtTime(0.0001, now);
-      output.gain.exponentialRampToValueAtTime(0.22, now + 0.045);
-      output.gain.setValueAtTime(0.18, now + 0.32);
-      output.gain.exponentialRampToValueAtTime(0.0001, now + 0.72);
+      output.gain.exponentialRampToValueAtTime(boss.heavy ? 0.27 : 0.22, now + 0.045);
+      output.gain.setValueAtTime(boss.heavy ? 0.22 : 0.18, now + duration * .46);
+      output.gain.exponentialRampToValueAtTime(0.0001, now + duration);
       output.connect(audio.destination);
 
       // 低频下滑负责兽吼的胸腔感，滤波噪声负责粗粝的嘶吼质感。
       const throat = audio.createOscillator();
       const throatFilter = audio.createBiquadFilter();
-      throat.type = 'sawtooth';
-      throat.frequency.setValueAtTime(105, now);
-      throat.frequency.exponentialRampToValueAtTime(46, now + 0.68);
+      throat.type = profile.wave;
+      throat.frequency.setValueAtTime(profile.base * pitch, now);
+      throat.frequency.exponentialRampToValueAtTime(profile.end * pitch, now + duration * .94);
       throatFilter.type = 'lowpass';
-      throatFilter.frequency.value = 420;
+      throatFilter.frequency.value = Math.max(260, profile.noise * .72);
       throat.connect(throatFilter);
       throatFilter.connect(output);
       throat.start(now);
-      throat.stop(now + 0.72);
+      throat.stop(now + duration);
+
+      // 第二声道的泛音让沙国王父子、虫妖、龙与僧人等拥有明显不同的音色。
+      const overtone = audio.createOscillator();
+      const overtoneGain = audio.createGain();
+      overtone.type = profile.wave === 'square' ? 'triangle' : 'sine';
+      overtone.frequency.setValueAtTime(profile.base * profile.harmonic * pitch, now);
+      overtone.frequency.exponentialRampToValueAtTime(profile.end * profile.harmonic * pitch, now + duration * .9);
+      overtoneGain.gain.setValueAtTime(0.0001, now);
+      overtoneGain.gain.exponentialRampToValueAtTime(.055 + profile.roughness * .055, now + .035);
+      overtoneGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * .92);
+      overtone.connect(overtoneGain);
+      overtoneGain.connect(output);
+      overtone.start(now);
+      overtone.stop(now + duration);
 
       const growl = audio.createBufferSource();
       const growlFilter = audio.createBiquadFilter();
       const growlGain = audio.createGain();
-      growl.buffer = getNoiseBuffer(audio, 'boss', 0.75);
-      growl.playbackRate.value = 0.78;
+      growl.buffer = getNoiseBuffer(audio, 'boss', 1.3);
+      growl.playbackRate.value = .7 + profile.roughness * .34;
       growlFilter.type = 'bandpass';
-      growlFilter.frequency.setValueAtTime(520, now);
-      growlFilter.frequency.exponentialRampToValueAtTime(190, now + 0.68);
-      growlFilter.Q.value = 1.1;
+      growlFilter.frequency.setValueAtTime(profile.noise * attackNoise, now);
+      growlFilter.frequency.exponentialRampToValueAtTime(Math.max(120, profile.noise * .34 * attackNoise), now + duration * .94);
+      growlFilter.Q.value = .7 + profile.roughness;
       growlGain.gain.setValueAtTime(0.0001, now);
-      growlGain.gain.exponentialRampToValueAtTime(0.65, now + 0.035);
-      growlGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+      growlGain.gain.exponentialRampToValueAtTime(.32 + profile.roughness * .42, now + 0.035);
+      growlGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * .97);
       growl.connect(growlFilter);
       growlFilter.connect(growlGain);
       growlGain.connect(output);
       growl.start(now);
-      growl.stop(now + 0.72);
+      growl.stop(now + Math.min(duration, 1.28));
     }
 
     const unlockGameAudio = () => getAudioContext();
@@ -3675,7 +3735,7 @@
             e.lastAttack = e.atk;
             e.attackAnimMax = e.atk === 'aoe' ? 26 : e.atk === 'lunge' ? 18 : 16;
             e.attackAnimT = e.attackAnimMax;
-            if (e.isBoss) playBossRoarSound();
+            if (e.isBoss) playBossRoarSound(e);
             if (e.atk === 'ranged') {
               spawnProjectile(e);
             } else if (e.atk === 'lunge') {
