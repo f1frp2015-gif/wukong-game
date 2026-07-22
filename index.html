@@ -625,6 +625,7 @@
     // 首次点击或按键时预先解锁音频，保证移动端随后由 Boss 自动触发的声音也能播放。
     let audioContext = null;
     const noiseBuffers = {};
+    const distortionCurves = {};
 
     function getAudioContext() {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -648,6 +649,19 @@
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
       noiseBuffers[key] = buffer;
       return buffer;
+    }
+
+    function getDistortionCurve(roughness) {
+      const key = Math.round(roughness * 10);
+      if (distortionCurves[key]) return distortionCurves[key];
+      const amount = 18 + key * 4;
+      const curve = new Float32Array(2048);
+      for (let i = 0; i < curve.length; i++) {
+        const x = i * 2 / (curve.length - 1) - 1;
+        curve[i] = (3 + amount) * x * (Math.PI / 9) / (Math.PI + amount * Math.abs(x));
+      }
+      distortionCurves[key] = curve;
+      return curve;
     }
 
     function playStaffHitSound() {
@@ -742,18 +756,36 @@
       output.gain.exponentialRampToValueAtTime(0.0001, now + duration);
       output.connect(audio.destination);
 
-      // 低频下滑负责兽吼的胸腔感，滤波噪声负责粗粝的嘶吼质感。
+      // 低频下滑经轻度失真后产生贴近耳边的喉音，不只是单纯提高音量。
       const throat = audio.createOscillator();
       const throatFilter = audio.createBiquadFilter();
+      const snarl = audio.createWaveShaper();
       throat.type = profile.wave;
       throat.frequency.setValueAtTime(profile.base * pitch, now);
       throat.frequency.exponentialRampToValueAtTime(profile.end * pitch, now + duration * .94);
       throatFilter.type = 'lowpass';
       throatFilter.frequency.value = Math.max(260, profile.noise * .72);
+      snarl.curve = getDistortionCurve(profile.roughness);
+      snarl.oversample = '2x';
       throat.connect(throatFilter);
-      throatFilter.connect(output);
+      throatFilter.connect(snarl);
+      snarl.connect(output);
       throat.start(now);
       throat.stop(now + duration);
+
+      // 半基频的胸腔震动给攻击加上压迫感，砸地和重击会尤其低沉。
+      const terrorSub = audio.createOscillator();
+      const terrorSubGain = audio.createGain();
+      terrorSub.type = 'sine';
+      terrorSub.frequency.setValueAtTime(Math.max(28, profile.base * pitch * .52), now);
+      terrorSub.frequency.exponentialRampToValueAtTime(Math.max(19, profile.end * pitch * .58), now + duration * .9);
+      terrorSubGain.gain.setValueAtTime(0.0001, now);
+      terrorSubGain.gain.exponentialRampToValueAtTime(boss.heavy || boss.atk === 'aoe' ? .16 : .105, now + .055);
+      terrorSubGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * .96);
+      terrorSub.connect(terrorSubGain);
+      terrorSubGain.connect(output);
+      terrorSub.start(now);
+      terrorSub.stop(now + duration);
 
       // 第二声道的泛音让沙国王父子、虫妖、龙与僧人等拥有明显不同的音色。
       const overtone = audio.createOscillator();
@@ -768,6 +800,18 @@
       overtoneGain.connect(output);
       overtone.start(now);
       overtone.stop(now + duration);
+
+      // 不稳定的颤音模拟野兽发力时声带抖动；每种 Boss 的粗粝度决定颤动速度。
+      const fearTremolo = audio.createOscillator();
+      const fearDepth = audio.createGain();
+      fearTremolo.type = 'sine';
+      fearTremolo.frequency.setValueAtTime(5.2 + profile.roughness * 8.5, now);
+      fearTremolo.frequency.linearRampToValueAtTime(3.4 + profile.roughness * 5, now + duration * .86);
+      fearDepth.gain.value = .018 + profile.roughness * .022;
+      fearTremolo.connect(fearDepth);
+      fearDepth.connect(output.gain);
+      fearTremolo.start(now);
+      fearTremolo.stop(now + duration * .9);
 
       const growl = audio.createBufferSource();
       const growlFilter = audio.createBiquadFilter();
@@ -786,6 +830,24 @@
       growlGain.connect(output);
       growl.start(now);
       growl.stop(now + Math.min(duration, 1.28));
+
+      // 起音的一口尖锐吸气让嘶吼有突然逼近的惊吓感，虫妖与风系 Boss 会更明显。
+      const dreadBreath = audio.createBufferSource();
+      const breathFilter = audio.createBiquadFilter();
+      const breathGain = audio.createGain();
+      dreadBreath.buffer = getNoiseBuffer(audio, 'boss', 1.3);
+      dreadBreath.playbackRate.value = 1.15 + profile.roughness * .38;
+      breathFilter.type = 'highpass';
+      breathFilter.frequency.setValueAtTime(Math.max(680, profile.noise * 1.2), now);
+      breathFilter.frequency.exponentialRampToValueAtTime(360, now + Math.min(.22, duration * .34));
+      breathGain.gain.setValueAtTime(0.0001, now);
+      breathGain.gain.exponentialRampToValueAtTime(.16 + profile.roughness * .16, now + .018);
+      breathGain.gain.exponentialRampToValueAtTime(0.0001, now + Math.min(.24, duration * .4));
+      dreadBreath.connect(breathFilter);
+      breathFilter.connect(breathGain);
+      breathGain.connect(output);
+      dreadBreath.start(now);
+      dreadBreath.stop(now + Math.min(.26, duration * .44));
     }
 
     const unlockGameAudio = () => getAudioContext();

@@ -175,6 +175,9 @@ for (const attackType of ['melee', 'lunge', 'ranged', 'aoe']) {
 const bossSoundTypes = ['boss','jinchi','shaguo','shixian','huxian','huangfeng','fuban','miaoyin','kanglong','buneng','bubai','bujing','bukong','huangmeiboss','macaque','erjie'];
 run(`globalThis.bossSoundSignatures = ${JSON.stringify(bossSoundTypes)}.map(type => { const p = getBossSoundProfile({ type }); return [p.base, p.end, p.noise, p.duration, p.wave, p.harmonic, p.roughness].join(':'); })`);
 if (run('new Set(bossSoundSignatures).size') !== bossSoundTypes.length) throw new Error('存在 Boss 共用了相同声纹');
+if (!source.includes('terrorSub') || !source.includes('fearTremolo') || !source.includes('dreadBreath') || !source.includes('createWaveShaper')) {
+  throw new Error('Boss 嘶吼缺少低频震动、恐惧颤音、惊吓吸气或失真层');
+}
 run("globalThis.bossRoarCalls = 0; globalThis.roaringBossType = ''; playBossRoarSound = boss => { bossRoarCalls++; roaringBossType = boss.type; }; enemies = [{ type:'boss', name:'音效测试Boss', x:player.x + 500, y:player.y, radius:34, hp:100, maxHp:100, dmg:10, speed:1, aggro:9999, isBoss:true, atk:'melee', attackAlt:0, heavy:false, state:'windup', windup:1, windupMax:32, recover:0, flash:0, frozen:0, bob:0, attackDirX:-1, attackDirY:0, lungeT:0, aoeT:0 }]; updateEnemies(); updateEnemies();");
 if (run('bossRoarCalls') !== 1) throw new Error(`Boss 嘶吼音效触发次数异常：${run('bossRoarCalls')}`);
 if (run('roaringBossType') !== 'boss') throw new Error('攻击时没有把 Boss 身份传给音效层');
