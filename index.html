@@ -417,6 +417,35 @@
       font-size: 13px;
     }
 
+    /* 酒葫芦：底部居中，双端一致。 */
+    #btn-gourd {
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      width: 56px;
+      height: 56px;
+      font-size: 16px;
+      z-index: 45;
+    }
+
+    #btn-gourd.empty { opacity: 0.45; filter: grayscale(0.7); }
+
+    #gourd-count {
+      position: absolute;
+      right: -4px;
+      top: -6px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 3px;
+      border-radius: 9px;
+      background: #d4af37;
+      color: #1a1208;
+      font-size: 11px;
+      font-weight: bold;
+      line-height: 18px;
+      text-align: center;
+    }
+
     #settings-btn {
       position: fixed;
       right: 16px;
@@ -452,6 +481,7 @@
       .resource-row { grid-template-columns: 32px 1fr 56px; gap: 5px; margin: 3px 0; font-size: 10px; }
       body.touch #player-resources { left: 10px; top: 10px; width: 180px; }
       #btn-attack { width: 76px; height: 76px; right: 18px; bottom: 77px; }
+      #btn-gourd { width: 48px; height: 48px; bottom: 22px; font-size: 14px; }
       #btn-dodge { width: 48px; height: 48px; font-size: 12px; }
       .skill { width: 48px; height: 48px; font-size: 9px; }
     }
@@ -501,6 +531,7 @@
 
   <button class="cbtn" id="btn-dodge">闪避</button>
   <button class="cbtn" id="btn-attack">攻击</button>
+  <button class="cbtn" id="btn-gourd">酒<span id="gourd-count">7</span></button>
   <button id="settings-btn" title="设置"><canvas id="settings-avatar"></canvas></button>
 
   <section id="settings-panel" class="modal">
@@ -586,6 +617,8 @@
     const mapTitleEl = document.getElementById('map-title');
     const mapTravelEl = document.getElementById('map-travel');
     const talentPointsEl = document.getElementById('talent-points');
+    const btnGourdEl = document.getElementById('btn-gourd');
+    const gourdCountEl = document.getElementById('gourd-count');
 
     const SAVE_KEY = 'haWukongProgressV3';
     const DEFAULT_PROGRESS = {
@@ -985,6 +1018,9 @@
     // 世界尺寸（远大于屏幕，镜头跟随玩家）。
     const WORLD = { w: 2400, h: 1800 };
     const HEAL_AMOUNT = 50;
+    // 酒葫芦：挂在腰间的回血道具，至多 7 口，开章与存档点复活时补满。
+    const GOURD_MAX = 7;
+    let gourdSips = GOURD_MAX;
     const BOSS_HP = 800;
 
     const keys = {};
@@ -1379,13 +1415,6 @@
       enemies = [];
       peaches = [];
       projectiles = [];
-      for (let i = 0; i < 3; i++) {
-        peaches.push({
-          x: randomRange(300, WORLD.w - 300),
-          y: randomRange(700, WORLD.h - 300),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 280;
       spawnJinchi();
@@ -1484,13 +1513,6 @@
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 260;
       refillResources();
-      for (let i = 0; i < 3; i++) {
-        peaches.push({
-          x: randomRange(300, WORLD.w - 300),
-          y: randomRange(500, WORLD.h - 300),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       spawnMiaoyin();
       banner = { text: '浮屠界 · 魔将妙音', timer: 170 };
       updateUI();
@@ -1563,13 +1585,6 @@
       icelakePhase = 'arrive';
       icelakeTimer = 150;
       banner = { text: '小西天 · 冰湖（存档点）', timer: 150 };
-      for (let i = 0; i < 3; i++) {
-        peaches.push({
-          x: randomRange(300, WORLD.w - 300),
-          y: randomRange(500, WORLD.h - 300),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       updateUI();
     }
 
@@ -1593,13 +1608,6 @@
       progress.reachedKuhai = true;
       progress.chapter3Checkpoint = 'kuhai';
       persistProgress();
-      for (let i = 0; i < 4; i++) {
-        peaches.push({
-          x: randomRange(360, WORLD.w - 360),
-          y: randomRange(620, WORLD.h - 300),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       banner = { text: '苦海 · 北岸', timer: 190 };
       grantChapterGrowth(3);
       updateUI();
@@ -1697,13 +1705,6 @@
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 300;
       refillResources();
-      for (let i = 0; i < 5; i++) {
-        peaches.push({
-          x: randomRange(420, WORLD.w - 420),
-          y: randomRange(760, WORLD.h - 260),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       progress.reachedLeiyin = true;
       progress.chapter3Checkpoint = 'leiyin';
       progress.leiyinBossIndex = leiyinBossIdx;
@@ -1809,13 +1810,6 @@
       peaches = [];
       projectiles = [];
       ally = null;
-      for (let i = 0; i < 3; i++) {
-        peaches.push({
-          x: randomRange(300, WORLD.w - 300),
-          y: randomRange(600, WORLD.h - 300),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 280;
       spawnMacaque();
@@ -1831,13 +1825,6 @@
       peaches = [];
       projectiles = [];
       ally = null;
-      for (let i = 0; i < 5; i++) {
-        peaches.push({
-          x: randomRange(420, WORLD.w - 420),
-          y: randomRange(760, WORLD.h - 260),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 420;
       huangmeiFight.phase = 3;
@@ -2024,13 +2011,6 @@
             clamp(cy + randomRange(-90, 90), 60, WORLD.h - 60));
         }
       }
-      for (let i = 0; i < 5; i++) {
-        peaches.push({
-          x: randomRange(150, WORLD.w - 150),
-          y: randomRange(150, WORLD.h - 150),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       chapter2BossIdx = Math.max(0, Math.min(startIndex, CHAPTER2_BOSSES.length - 1));
       nextBossCountdown = 0;
       gustTimer = 0;
@@ -2107,13 +2087,6 @@
       enemies = [];
       peaches = [];
       projectiles = [];
-      for (let i = 0; i < 3; i++) {
-        peaches.push({
-          x: randomRange(300, WORLD.w - 300),
-          y: randomRange(700, WORLD.h - 300),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       player.x = WORLD.w / 2;
       player.y = WORLD.h - 280;
       spawnFuban();
@@ -2354,13 +2327,6 @@
             clamp(cy + randomRange(-90, 90), 60, WORLD.h - 60));
         }
       }
-      for (let i = 0; i < 6; i++) {
-        peaches.push({
-          x: randomRange(150, WORLD.w - 150),
-          y: randomRange(150, WORLD.h - 150),
-          pulse: randomRange(0, Math.PI * 2)
-        });
-      }
       // 装饰：树木、岩石、花草。
       decor = { trees: [], rocks: [], flowers: [] };
       for (let i = 0; i < 40; i++) {
@@ -2422,7 +2388,29 @@
       player.hp = player.maxHp;
       player.mana = player.maxMana;
       player.stamina = player.maxStamina;
+      gourdSips = GOURD_MAX;
+      updateGourdUI();
       updateResourceUI();
+    }
+
+    // 酒葫芦 UI 与饮用。
+    function updateGourdUI() {
+      if (!gourdCountEl) return;
+      gourdCountEl.textContent = gourdSips;
+      btnGourdEl.classList.toggle('empty', gourdSips <= 0);
+    }
+
+    function drinkGourd() {
+      if (modalOpen || !gameRunning || player.hp <= 0) return;
+      if (gourdSips <= 0) { banner = { text: '酒葫芦已空……', timer: 90 }; return; }
+      if (player.hp >= player.maxHp) { banner = { text: '气血已满，暂且不饮', timer: 90 }; return; }
+      gourdSips--;
+      const healed = Math.min(HEAL_AMOUNT, player.maxHp - player.hp);
+      player.hp += healed;
+      createDamageText(player.x, player.y - player.r * 4, `+${healed}`, '#8be89b');
+      createParticles(player.x, player.y - 30, '#e8d9a8', 12);
+      updateUI();
+      updateGourdUI();
     }
 
     function updateUI() {
@@ -2475,6 +2463,8 @@
       dodge.cooldown = 0;
       enemies = [];
       peaches = [];
+      gourdSips = GOURD_MAX;
+      updateGourdUI();
       projectiles = [];
       particles = [];
       projectiles = [];
@@ -7396,6 +7386,23 @@
         ctx.fillStyle = '#a3352c';
         ctx.fillRect(-u * 0.68, -u * 1.95, u * 1.36, u * 0.28);
 
+        // 腰间酒葫芦（回血道具，共 7 口）。
+        ctx.fillStyle = '#a8702f';
+        ctx.beginPath();
+        ctx.arc(-u * 0.88, hipY + u * 0.32, u * 0.32, 0, Math.PI * 2);
+        ctx.arc(-u * 0.88, hipY - u * 0.04, u * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#c89048';
+        ctx.beginPath();
+        ctx.arc(-u * 0.96, hipY + u * 0.22, u * 0.1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#7a3a1c';
+        ctx.lineWidth = u * 0.07;
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.88, hipY - u * 0.22);
+        ctx.lineTo(-u * 0.88, hipY - u * 0.36);
+        ctx.stroke();
+
         // 左臂（走动时前后摆动）。
         ctx.strokeStyle = '#5a4a34';
         ctx.lineWidth = u * 0.4;
@@ -7854,7 +7861,7 @@
         return;
       }
       if (modalOpen) return;
-      if (e.repeat && ['j','J','q','Q','1','2','3','Shift'].includes(e.key)) return;
+      if (e.repeat && ['j','J','q','Q','1','2','3','Shift','h','H'].includes(e.key)) return;
       if (e.key === ' ') {
         startCharge();
       }
@@ -7869,6 +7876,9 @@
         const dx = player.moveDx || Math.cos(player.angle);
         const dy = player.moveDy || Math.sin(player.angle);
         startDodge(dx, dy);
+      }
+      if (e.key === 'h' || e.key === 'H') {
+        drinkGourd();
       }
       if ((e.key === 'r' || e.key === 'R') && !gameRunning) {
         restartGame();
@@ -7977,6 +7987,13 @@
       e.preventDefault();
     }, { passive: false });
     btnDodge.addEventListener('click', dodgeFromBtn);
+
+    // 酒葫芦：点击饮酒回血（共 7 口，存档点补满）。
+    btnGourdEl.addEventListener('touchstart', (e) => {
+      drinkGourd();
+      e.preventDefault();
+    }, { passive: false });
+    btnGourdEl.addEventListener('click', drinkGourd);
 
     // 技能按钮：点击施放（与键盘 1—4 一致）。
     for (const def of SPELL_DEFS) {
