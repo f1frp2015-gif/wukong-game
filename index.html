@@ -103,6 +103,7 @@
     #player-hp-fill { background: linear-gradient(90deg, #a92220, #e35b3d); }
     #player-mana-fill { background: linear-gradient(90deg, #1954a6, #56a8ff); }
     #player-stamina-fill { background: linear-gradient(90deg, #8b791a, #ead84e); }
+    #player-xp-fill { background: linear-gradient(90deg, #5a3a98, #c9a7ff); }
     .resource-value { text-align: right; font-variant-numeric: tabular-nums; }
 
     body.touch #player-resources {
@@ -501,6 +502,9 @@
     <div id="player-stamina" class="resource-row">
       <span>气力</span><span class="resource-track"><i id="player-stamina-fill" class="resource-fill"></i></span><span id="player-stamina-text" class="resource-value">100/100</span>
     </div>
+    <div id="player-level" class="resource-row">
+      <span id="player-level-text">Lv.1</span><span class="resource-track"><i id="player-xp-fill" class="resource-fill"></i></span><span id="player-xp-text" class="resource-value">0/110</span>
+    </div>
   </div>
   <div id="boss-hp">黑风大王 HP: 800/800</div>
   <div id="objective">第一章 · 寻找三口山钟，探索黑风山</div>
@@ -602,6 +606,9 @@
     const playerManaFillEl = document.getElementById('player-mana-fill');
     const playerStaminaTextEl = document.getElementById('player-stamina-text');
     const playerStaminaFillEl = document.getElementById('player-stamina-fill');
+    const playerLevelTextEl = document.getElementById('player-level-text');
+    const playerXpTextEl = document.getElementById('player-xp-text');
+    const playerXpFillEl = document.getElementById('player-xp-fill');
     const bossHpEl = document.getElementById('boss-hp');
     const overlay = document.getElementById('overlay');
     const overlayTitle = document.getElementById('overlay-title');
@@ -862,7 +869,8 @@
       unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [],
       equippedSpells: ['freeze', 'cloud', 'pluck'],
       weaponLevel: 0, trinkets: [], damageBonus: 0,
-      talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false, reachedZhizhudong: false
+      talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false, reachedZhizhudong: false,
+      level: 1, xp: 0
     };
 
     // 可在土地庙配置的法术/变化/法宝，技能栏键位 1—4 按此顺序分配。
@@ -929,7 +937,7 @@
           bossRewards
         };
       } catch {
-        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [], equippedSpells: ['freeze', 'cloud', 'pluck'], weaponLevel: 0, trinkets: [], damageBonus: 0, bossRewards: [] };
+        return { ...DEFAULT_PROGRESS, talents: { ...DEFAULT_PROGRESS.talents }, unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [], equippedSpells: ['freeze', 'cloud', 'pluck'], weaponLevel: 0, trinkets: [], damageBonus: 0, bossRewards: [], level: 1, xp: 0 };
       }
     }
 
@@ -1241,6 +1249,8 @@
     function applyPersistentState() {
       player.hasMantle = isUnlocked('unlockedRelics', 'mantle');
       player.hasWindPearl = isUnlocked('unlockedRelics', 'pearl');
+      // 读档/开局套用等级与天赋属性，避免高等级存档血上限回落。
+      applyTalentStats(false);
     }
 
     function startChapter(chapter) {
@@ -1355,9 +1365,9 @@
       const oldMax = player.maxHp;
       const oldMaxMana = player.maxMana;
       const oldMaxStamina = player.maxStamina;
-      player.maxHp = 300 + progress.talents.body * 35 + (progress.trinkets.includes('miaoyin-bell') ? 40 : 0);
-      player.maxMana = 100 + progress.talents.spell * 15 + (progress.trinkets.includes('jinchi-bead') ? 30 : 0);
-      player.maxStamina = 100 + progress.talents.body * 10 + (progress.trinkets.includes('long-scale') ? 30 : 0);
+      player.maxHp = 300 + progress.talents.body * 35 + (progress.trinkets.includes('miaoyin-bell') ? 40 : 0) + ((progress.level || 1) - 1) * 6;
+      player.maxMana = 100 + progress.talents.spell * 15 + (progress.trinkets.includes('jinchi-bead') ? 30 : 0) + ((progress.level || 1) - 1) * 3;
+      player.maxStamina = 100 + progress.talents.body * 10 + (progress.trinkets.includes('long-scale') ? 30 : 0) + ((progress.level || 1) - 1) * 2;
       dodge.maxCooldown = Math.max(27, 42 - progress.talents.body * 5);
       if (heal) {
         player.hp = player.maxHp;
@@ -1538,9 +1548,9 @@
         x: WORLD.w - 450,
         y: 400,
         radius: 34,
-        hp: BOSS_HP + bossHpBonus(),
-        maxHp: BOSS_HP + bossHpBonus(),
-        dmg: 40,
+        hp: bossScaledHp(BOSS_HP),
+        maxHp: bossScaledHp(BOSS_HP),
+        dmg: bossScaledDmg(40),
         speed: 1.3,
         aggro: 340,
         isBoss: true,
@@ -1575,9 +1585,9 @@
         x: WORLD.w / 2,
         y: 560,
         radius: 30,
-        hp: 1200 + bossHpBonus(),
-        maxHp: 1200 + bossHpBonus(),
-        dmg: 30,
+        hp: bossScaledHp(1200),
+        maxHp: bossScaledHp(1200),
+        dmg: bossScaledDmg(30),
         speed: 1.25,
         aggro: 9999,
         isBoss: true,
@@ -1726,9 +1736,9 @@
         x: WORLD.w / 2,
         y: 420,
         radius: 44,
-        hp: 2400 + bossHpBonus(),
-        maxHp: 2400 + bossHpBonus(),
-        dmg: 46,
+        hp: bossScaledHp(2400),
+        maxHp: bossScaledHp(2400),
+        dmg: bossScaledDmg(46),
         speed: 1.15,
         aggro: 9999,
         isBoss: true,
@@ -1898,9 +1908,9 @@
         x,
         y,
         radius: d.radius,
-        hp: d.hp + bossHpBonus(),
-        maxHp: d.hp + bossHpBonus(),
-        dmg: d.dmg,
+        hp: bossScaledHp(d.hp),
+        maxHp: bossScaledHp(d.hp),
+        dmg: bossScaledDmg(d.dmg),
         speed: d.speed,
         aggro: 9999,
         isBoss: true,
@@ -2015,9 +2025,9 @@
         x: WORLD.w / 2,
         y: 480,
         radius: 30,
-        hp: 2600 + bossHpBonus(),
-        maxHp: 2600 + bossHpBonus(),
-        dmg: 40,
+        hp: bossScaledHp(2600),
+        maxHp: bossScaledHp(2600),
+        dmg: bossScaledDmg(40),
         speed: 1.7,
         aggro: 9999,
         isBoss: true,
@@ -2093,9 +2103,9 @@
         windups: enraged ? [26, 40, 24, 36] : [32, 46, 28, 40],
         x, y,
         radius: 36,
-        hp: enraged ? hp : hp + bossHpBonus(),
-        maxHp: 2600 + bossHpBonus(),
-        dmg: enraged ? 46 : 40,
+        hp: enraged ? hp : bossScaledHp(2600),
+        maxHp: bossScaledHp(2600),
+        dmg: bossScaledDmg(enraged ? 46 : 40),
         speed: enraged ? 1.75 : 1.45,
         aggro: 9999,
         isBoss: true,
@@ -2139,9 +2149,9 @@
         x: WORLD.w / 2,
         y: 520,
         radius: 28,
-        hp: 1800 + bossHpBonus(),
-        maxHp: 1800 + bossHpBonus(),
-        dmg: 34,
+        hp: bossScaledHp(1800),
+        maxHp: bossScaledHp(1800),
+        dmg: bossScaledDmg(34),
         speed: 1.9,
         aggro: 9999,
         isBoss: true,
@@ -2245,9 +2255,9 @@
         x: WORLD.w / 2,
         y: 520,
         radius: 34,
-        hp: 2000 + bossHpBonus(),
-        maxHp: 2000 + bossHpBonus(),
-        dmg: 42,
+        hp: bossScaledHp(2000),
+        maxHp: bossScaledHp(2000),
+        dmg: bossScaledDmg(42),
         speed: 1.5,
         aggro: 9999,
         isBoss: true,
@@ -2317,9 +2327,9 @@
         x: d.x,
         y: d.y,
         radius: d.radius,
-        hp: d.hp + bossHpBonus(),
-        maxHp: d.hp + bossHpBonus(),
-        dmg: d.dmg,
+        hp: bossScaledHp(d.hp),
+        maxHp: bossScaledHp(d.hp),
+        dmg: bossScaledDmg(d.dmg),
         speed: d.speed,
         aggro: d.aggro,
         isBoss: true,
@@ -2416,9 +2426,9 @@
         x: WORLD.w / 2,
         y: 460,
         radius: 40,
-        hp: 1800 + bossHpBonus(),
-        maxHp: 1800 + bossHpBonus(),
-        dmg: 38,
+        hp: bossScaledHp(1800),
+        maxHp: bossScaledHp(1800),
+        dmg: bossScaledDmg(38),
         speed: 1.2,
         aggro: 9999,
         isBoss: true,
@@ -2747,6 +2757,10 @@
       playerHpFillEl.style.width = `${clamp(player.hp / player.maxHp * 100, 0, 100)}%`;
       playerManaFillEl.style.width = `${clamp(player.mana / player.maxMana * 100, 0, 100)}%`;
       playerStaminaFillEl.style.width = `${clamp(player.stamina / player.maxStamina * 100, 0, 100)}%`;
+      const lv = progress.level || 1;
+      playerLevelTextEl.textContent = `Lv.${lv}`;
+      playerXpTextEl.textContent = `${Math.floor(progress.xp || 0)}/${xpNeed(lv)}`;
+      playerXpFillEl.style.width = `${clamp((progress.xp || 0) / xpNeed(lv) * 100, 0, 100)}%`;
     }
 
     function spendResource(type, amount) {
@@ -2900,6 +2914,7 @@
       scatterWorld();
       spawnBells();
       setObjective('第一章 · 黑风山：寻找三口山钟，探索隐藏禅院；也可直接挑战黑风大王');
+      applyTalentStats(false);
       updateUnlockUI();
       updateUI();
     }
@@ -3004,6 +3019,36 @@
 
     function bossHpBonus() { return (currentChapterNum() - 1) * 100; }
 
+    // Boss 相对难度：血量与攻击随玩家等级小幅提升，等级不会把 Boss 碾压成木桩。
+    function bossScaledHp(base) {
+      return Math.round((base + bossHpBonus()) * (1 + 0.04 * ((progress.level || 1) - 1)));
+    }
+
+    function bossScaledDmg(base) {
+      return Math.round(base * (1 + 0.02 * ((progress.level || 1) - 1)));
+    }
+
+    // 等级系统：杀怪得经验，升级全面提升（生命/法力/气力/攻击）。
+    function xpNeed(lv) { return 60 + lv * 40 + lv * lv * 10; }
+
+    function grantXp(amount) {
+      progress.xp = (progress.xp || 0) + amount;
+      createDamageText(player.x, player.y - player.r * 4.6, `+${amount} 经验`, '#c9a7ff');
+      let leveled = 0;
+      while (progress.xp >= xpNeed(progress.level || 1)) {
+        progress.xp -= xpNeed(progress.level || 1);
+        progress.level = (progress.level || 1) + 1;
+        leveled++;
+      }
+      if (leveled > 0) {
+        applyTalentStats(false);
+        banner = { text: `等级提升！Lv.${progress.level}　生命+${6 * leveled} 攻击+${2 * leveled}`, timer: 170 };
+        createParticles(player.x, player.y - 40, '#ffd700', 30);
+      }
+      persistProgress();
+      updateResourceUI();
+    }
+
     function grantChapterGrowth(chapter) {
       const target = (chapter - 1) * 10;
       if ((progress.damageBonus || 0) >= target) return;
@@ -3017,6 +3062,11 @@
 
     function applyDamage(e, damage) {
       damage = Math.round(damage * (1 + (progress.weaponLevel || 0) * 0.08));
+      // Boss 收招硬直是破绽：此时受到的伤害 ×1.6，看招打后摇胜过一味站撸。
+      if (e.isBoss && e.state === 'recover') {
+        damage = Math.round(damage * 1.6);
+        createDamageText(e.x, e.y - e.radius * 3.7, '破', '#ffd24a');
+      }
       if (e.isBoss && progress.trinkets.includes('heifeng-mane')) damage = Math.round(damage * 1.08);
       // 法术·凝神四段：定身目标必定暴击。
       if (e.frozen > 0 && progress.talents.spell >= 4) damage = Math.round(damage * 1.5);
@@ -3024,8 +3074,8 @@
         damage = Math.round(damage * 1.35);
         e.freezeBonusUsed = true;
       }
-      // 章节成长：每章伤害 +10（永久，平加到最后一击）。
-      damage += (progress.damageBonus || 0);
+      // 章节成长：每章伤害 +10（永久，平加到最后一击）；等级每级 +2。
+      damage += (progress.damageBonus || 0) + ((progress.level || 1) - 1) * 2;
       e.hp -= damage;
       e.flash = 6;
       createDamageText(e.x, e.y - e.radius * 3, damage);
@@ -3042,6 +3092,7 @@
         enemies.splice(i, 1);
         if (e.isBoss) {
           score += 500;
+          grantXp(150 + currentChapterNum() * 50);
           bossHpEl.style.display = 'none';
           if (e.name === '金池长老') {
             // 击败金池长老：获得避火罩，短暂停留后回到黑风山。
@@ -3189,6 +3240,7 @@
         }
         score += e.score;
         kills++;
+        grantXp(e.score || 15);
         progress.spirit += Math.max(6, Math.round(e.score * .6));
         if (progress.trinkets.includes('sack-shard')) player.mana = Math.min(player.maxMana, player.mana + 10);
         if (progress.talents.spell >= 3) {

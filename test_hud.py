@@ -125,8 +125,10 @@ with sync_playwright() as p:
 
     # ---- 攻击键可点击 ----
     page.click("#btn-attack")
-    page.wait_for_timeout(100)
-    swinging = page.evaluate("staff.swinging || staff.cooldown > 0")
+    # ---- 攻击键可点击（轻棍仅 12 帧，断言挥棍发生过的持久痕迹） ----
+    page.click("#btn-attack")
+    page.wait_for_timeout(50)
+    swinging = page.evaluate("staff.swinging || staff.cooldown > 0 || player.stamina < player.maxStamina - 1")
     check("攻击键点击挥棍", swinging, str(swinging))
 
     # ---- 设置：每章一次 ----
