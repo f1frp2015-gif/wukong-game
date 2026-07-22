@@ -558,11 +558,12 @@
   <section id="start-menu" class="modal visible">
     <div class="modal-card">
       <h2>哈悟空</h2>
-      <p>从黑风山一路修行至小西天。击败强敌获得修行点，在土地庙参悟流派，并自由配置法术（至多 3 个，法宝仅能择一）。</p>
+      <p>从黑风山一路修行至兰喜村蜘蛛洞。击败强敌获得修行点，在土地庙参悟流派，并自由配置法术（至多 3 个，法宝仅能择一）。</p>
       <div class="menu-actions">
         <button onclick="startChapter(1)">第一章 · 黑风山</button>
         <button id="chapter2-button" onclick="startChapter(2)">第二章 · 黄风岭</button>
         <button id="chapter3-button" onclick="startChapter(3)">第三章 · 小西天</button>
+        <button id="chapter4-button" onclick="startChapter(4)">第四章 · 兰喜村</button>
         <button onclick="openTalentPanel(true)">土地庙悟道</button>
       </div>
       <p id="save-summary"></p>
@@ -628,7 +629,7 @@
       unlockedStances: ['chop'], unlockedSkills: ['freeze', 'cloud', 'pluck'], unlockedRelics: [],
       equippedSpells: ['freeze', 'cloud', 'pluck'],
       weaponLevel: 0, trinkets: [], damageBonus: 0,
-      talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false
+      talents: { staff: 0, spell: 0, body: 0 }, bossRewards: [], completedChapter3: false, reachedZhizhudong: false
     };
 
     // 可在土地庙配置的法术/变化/法宝，技能栏键位 1—4 按此顺序分配。
@@ -711,6 +712,7 @@
       progressHudEl.innerHTML = `灵蕴 ${progress.spirit}<br/>修行点 ${progress.cultivation}`;
       document.getElementById('chapter2-button').disabled = progress.chapterUnlocked < 2;
       document.getElementById('chapter3-button').disabled = progress.chapterUnlocked < 3;
+      document.getElementById('chapter4-button').disabled = progress.chapterUnlocked < 4;
       document.getElementById('save-summary').textContent = progress.completedChapter3
         ? '第三章已通关 · 可继续完善流派与重玩章节'
         : progress.completedLeiyinGuardians
@@ -785,17 +787,22 @@
       leiyin:    { name: '第三章 · 小雷音寺', color: '#2b2113', landmarks: [
         { name: '入口', x: 1200, y: 1500 }, { name: '大殿', x: 1200, y: 500, boss: true } ] },
       renzhongdai: { name: '人种袋', color: '#3a1518', landmarks: [
-        { name: '袋口', x: 1200, y: 1520 }, { name: '赤尻马猴', x: 1200, y: 520, boss: true } ] }
+        { name: '袋口', x: 1200, y: 1520 }, { name: '赤尻马猴', x: 1200, y: 520, boss: true } ] },
+      lanxi:     { name: '第四章 · 兰喜村', color: '#33241c', landmarks: [
+        { name: '村口', x: 1200, y: 1540 }, { name: '二姐', x: 1200, y: 480, boss: true } ] },
+      zhizhudong: { name: '第四章 · 蜘蛛洞', color: '#160f1e', landmarks: [
+        { name: '洞口', x: 1200, y: 1500 }, { name: '洞窟深处', x: 1200, y: 480 } ] }
     };
     // 可神行的枢纽区域：解锁条件与重入方式。
     const TRAVEL_SPOTS = [
       { map: 'forest', name: '黑风山', unlocked: () => true, go: () => startChapter(1) },
       { map: 'huangfeng', name: '黄风岭', unlocked: () => progress.chapterUnlocked >= 2, go: () => enterHuangfeng() },
       { map: 'kuhai', name: '苦海北岸', unlocked: () => progress.reachedKuhai, go: () => enterKuhai() },
-      { map: 'leiyin', name: '小雷音寺', unlocked: () => progress.reachedLeiyin, go: () => setupLeiyin(progress.leiyinBossIndex || 0) }
+      { map: 'leiyin', name: '小雷音寺', unlocked: () => progress.reachedLeiyin, go: () => setupLeiyin(progress.leiyinBossIndex || 0) },
+      { map: 'lanxi', name: '兰喜村', unlocked: () => progress.chapterUnlocked >= 4, go: () => startChapter(4) }
     ];
     // 剧情/隐藏区域不允许神行离开，避免打断剧情脚本。
-    const TRAVEL_FROM_OK = ['forest', 'huangfeng', 'kuhai', 'leiyin'];
+    const TRAVEL_FROM_OK = ['forest', 'huangfeng', 'kuhai', 'leiyin', 'lanxi', 'zhizhudong'];
 
     function openMapPanel() {
       if (!gameRunning || startMenuEl.classList.contains('visible') || talentPanelEl.classList.contains('visible')) return;
@@ -1011,6 +1018,9 @@
         if (progress.chapter3Checkpoint === 'leiyin' || progress.reachedLeiyin) setupLeiyin(progress.leiyinBossIndex || 0);
         else if (progress.chapter3Checkpoint === 'kuhai' || progress.reachedKuhai) enterKuhai();
         else startChapter3Intro();
+      } else if (chapter === 4) {
+        if (progress.reachedZhizhudong) enterZhizhudong();
+        else startChapter4Intro();
       }
       if (chapter >= 2) grantChapterGrowth(chapter);
     }
@@ -1163,7 +1173,8 @@
       wolf: { name: '狼妖', hp: 40, dmg: 10, speed: 1.6, radius: 20, aggro: 260, score: 20, atk: 'lunge' },
       snake: { name: '蛇妖', hp: 25, dmg: 8, speed: 2.4, radius: 14, aggro: 240, score: 15, atk: 'ranged' },
       golem: { name: '石精', hp: 90, dmg: 16, speed: 0.8, radius: 26, aggro: 210, score: 30, atk: 'aoe' },
-      rat: { name: '鼠妖', hp: 30, dmg: 9, speed: 2.2, radius: 15, aggro: 250, score: 18, atk: 'ranged' }
+      rat: { name: '鼠妖', hp: 30, dmg: 9, speed: 2.2, radius: 15, aggro: 250, score: 18, atk: 'ranged' },
+      spiderling: { name: '小蛛妖', hp: 60, dmg: 12, speed: 2.0, radius: 16, aggro: 340, score: 25, atk: 'lunge' }
     };
 
     let enemies = [];
@@ -1208,6 +1219,9 @@
     let gustTimer = 0;
     // 身法四段：完美闪避令时间短暂减慢。
     let slowMoTimer = 0;
+    // 第四章：兰喜村剧情状态与二姐拖人入洞倒计时。
+    let lanxiPhase = null;
+    let dragCountdown = 0;
     let score = 0;
     let kills = 0;
     let bossActive = false;
@@ -1719,6 +1733,118 @@
       setupLeiyin(progress.leiyinBossIndex || 0);
     }
 
+    // ---------- 第四章：兰喜村 · 二姐 · 蜘蛛洞 ----------
+    function startChapter4Intro() {
+      settingsUsed = false;
+      currentMap = 'lanxi';
+      lanxiPhase = 'walk';
+      dragCountdown = 0;
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      huangmei = null;
+      bossActive = false;
+      bossHpEl.style.display = 'none';
+      checkpoint = { map: 'lanxi' };
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 260;
+      refillResources();
+      // 猪八戒前来会合，并肩作战。
+      ally = {
+        kind: 'bajie',
+        x: WORLD.w / 2 + 140,
+        y: WORLD.h - 280,
+        radius: 30,
+        bob: 0,
+        state: 'idle',
+        windupVis: 0,
+        flash: 0,
+        frozen: 0,
+        noBar: true,
+        attackCd: 0
+      };
+      setObjective('第四章 · 兰喜村：与猪八戒一同北行，探查村中妖气');
+      banner = { text: '第四章 · 兰喜村', timer: 170 };
+      grantChapterGrowth(4);
+      updateUI();
+    }
+
+    function spawnErjie() {
+      enemies.push({
+        type: 'erjie',
+        name: '二姐',
+        windups: [30, 24, 38],
+        x: WORLD.w / 2,
+        y: 480,
+        radius: 30,
+        hp: 2600 + bossHpBonus(),
+        maxHp: 2600 + bossHpBonus(),
+        dmg: 40,
+        speed: 1.7,
+        aggro: 9999,
+        isBoss: true,
+        atk: 'ranged',
+        atkCycle: ['ranged', 'lunge', 'melee'],
+        attackAlt: 0,
+        heavy: false,
+        lungeT: 0,
+        lungeVx: 0,
+        lungeVy: 0,
+        lungeHit: false,
+        aoeT: 0,
+        aoeHit: false,
+        state: 'chase',
+        wanderT: 0,
+        wanderA: 0,
+        windup: 0,
+        recover: 0,
+        flash: 0,
+        frozen: 0,
+        bob: 0,
+        spiderForm: false
+      });
+      bossActive = true;
+      setObjective('第四章 · 兰喜村：与猪八戒合力击败二姐');
+      banner = { text: '二姐：何方神圣，敢闯兰喜村！', timer: 170 };
+      createParticles(WORLD.w / 2, 480 - 30, '#d8a7e8', 26);
+      updateUI();
+    }
+
+    // 兰喜村剧情：北行触发二姐现身；二姐亡后垂死拖人入洞。
+    function updateLanxi() {
+      if (currentMap !== 'lanxi') return;
+      if (lanxiPhase === 'walk' && player.y < 640) {
+        lanxiPhase = 'fight';
+        spawnErjie();
+      }
+      if (dragCountdown > 0 && --dragCountdown <= 0) enterZhizhudong();
+    }
+
+    function enterZhizhudong() {
+      currentMap = 'zhizhudong';
+      lanxiPhase = null;
+      dragCountdown = 0;
+      enemies = [];
+      peaches = [];
+      projectiles = [];
+      ally = null;
+      bossActive = false;
+      bossHpEl.style.display = 'none';
+      checkpoint = { map: 'zhizhudong' };
+      player.x = WORLD.w / 2;
+      player.y = WORLD.h - 300;
+      refillResources();
+      // 洞中蛛妖环伺。
+      const spots = [[-320, -160], [300, -220], [0, -420], [-180, -520], [220, -560]];
+      for (const [ox, oy] of spots) spawnEnemy('spiderling', WORLD.w / 2 + ox, WORLD.h / 2 + oy);
+      progress.reachedZhizhudong = true;
+      persistProgress();
+      setObjective('第四章 · 蜘蛛洞：杀出重围，寻找出口');
+      banner = { text: '蜘蛛洞 · 阴风阵阵，蛛丝密布', timer: 190 };
+      grantChapterGrowth(4);
+      updateUI();
+    }
+
     // 黄眉终局战：一阶段大殿交手，半血后被收入人种袋战赤尻马猴，破袋后与黄眉真身决战。
     function spawnHuangmeiBoss(hp, enraged) {
       const x = WORLD.w / 2, y = 420;
@@ -2124,11 +2250,22 @@
       updateUI();
     }
 
-    // 盟友黄风大圣：追击隐藏 BOSS 并挥叉攻击。
+    // 盟友：无战事时猪八戒跟随天命人；遇敌则追击 BOSS 并挥耙攻击。
     function updateAlly() {
       if (!ally) return;
       const boss = enemies.find(e => e.isBoss);
-      if (!boss) return;
+      if (!boss) {
+        if (ally.kind === 'bajie') {
+          const fdx = player.x - 90 - ally.x;
+          const fdy = player.y + 40 - ally.y;
+          const fdist = Math.hypot(fdx, fdy);
+          if (fdist > 80) {
+            ally.x += (fdx / fdist) * 2.4;
+            ally.y += (fdy / fdist) * 2.4;
+          }
+        }
+        return;
+      }
       const dx = boss.x - ally.x;
       const dy = boss.y - ally.y;
       const dist = Math.hypot(dx, dy);
@@ -2622,6 +2759,7 @@
       if (currentMap === 'huangfeng' || currentMap === 'sahali') return 2;
       if (currentMap === 'intro' || currentMap === 'futu' || currentMap === 'icelake'
         || currentMap === 'kuhai' || currentMap === 'leiyin' || currentMap === 'renzhongdai') return 3;
+      if (currentMap === 'lanxi' || currentMap === 'zhizhudong') return 4;
       return 1;
     }
 
@@ -2706,10 +2844,21 @@
             grantTrinket('sack-shard');
             bossActive = false;
             progress.completedChapter3 = true;
+            progress.chapterUnlocked = Math.max(4, progress.chapterUnlocked);
             huangmeiFight.phase = 4;
             persistProgress();
             banner = { text: '黄眉已灭！小西天重见天日！', timer: 220 };
             victoryCountdown = 240;
+            updateUI();
+            return false;
+          }
+          if (e.type === 'erjie') {
+            // 二姐已灭，垂死反扑将天命人拖入蜘蛛洞。
+            grantBossReward('erjie', 420);
+            bossActive = false;
+            ally = null;
+            banner = { text: '二姐垂死反扑，将你拖入蜘蛛洞！', timer: 200 };
+            dragCountdown = 190;
             updateUI();
             return false;
           }
@@ -3308,6 +3457,17 @@
         if (slowMoTimer > 0 && frameCount % 2 === 0) continue;
         if (e.flash > 0) e.flash--;
         // 血量过半狂暴：提速增伤，并切换更凶的攻击循环。
+        // 二姐半血现出蜘蛛真身。
+        if (e.type === 'erjie' && !e.spiderForm && e.hp <= e.maxHp * 0.5) {
+          e.spiderForm = true;
+          e.name = '二姐·蜘蛛精';
+          e.radius = 40;
+          e.speed = 2.1;
+          e.dmg = 46;
+          e.atkCycle = ['lunge', 'aoe', 'ranged', 'lunge'];
+          banner = { text: '二姐现出蜘蛛真身！', timer: 160 };
+          createParticles(e.x, e.y - e.radius, '#e8e8f0', 26);
+        }
         if (e.isBoss && !e.enraged && e.enrage && e.hp <= e.maxHp * 0.5) {
           e.enraged = true;
           e.speed *= e.enrage.speedMult || 1.25;
@@ -3476,6 +3636,107 @@
     // ---------- 绘制 ----------
 
     function drawGround() {
+      if (currentMap === 'lanxi') {
+        // 兰喜村：暮色笼罩的山村，暗褐土地衬着零星屋舍与昏黄窗火。
+        const dusk = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        dusk.addColorStop(0, '#4a3630');
+        dusk.addColorStop(1, '#5d4a38');
+        ctx.fillStyle = dusk;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < 40; i++) {
+          const gx = seeded(i + 31000) * WORLD.w;
+          const gy = seeded(i + 31400) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -160 || sy < -160 || sx > canvas.width + 160 || sy > canvas.height + 160) continue;
+          ctx.fillStyle = `rgba(${40 + Math.round(seeded(i) * 30)},28,22,${0.14 + seeded(i + 1) * 0.12})`;
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 60 + seeded(i + 2) * 90, 30 + seeded(i + 3) * 40, seeded(i + 4) * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        for (let i = 0; i < 8; i++) {
+          const side = i % 2 === 0 ? -1 : 1;
+          const hx = WORLD.w / 2 + side * (300 + seeded(i + 32000) * 320) - camera.x;
+          const hy = (420 + i * 150 + seeded(i + 32100) * 60) - camera.y;
+          if (hx < -220 || hy < -220 || hx > canvas.width + 220 || hy > canvas.height + 220) continue;
+          ctx.fillStyle = '#2a201c';
+          ctx.beginPath();
+          ctx.moveTo(hx - 78, hy - 52);
+          ctx.lineTo(hx, hy - 96);
+          ctx.lineTo(hx + 78, hy - 52);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#cfc4b2';
+          ctx.fillRect(hx - 62, hy - 52, 124, 62);
+          ctx.fillStyle = '#3a2c22';
+          ctx.fillRect(hx - 14, hy - 24, 28, 34);
+          ctx.fillStyle = 'rgba(255,190,90,0.85)';
+          ctx.fillRect(hx - 46, hy - 38, 16, 14);
+          ctx.fillRect(hx + 30, hy - 38, 16, 14);
+        }
+        return;
+      }
+
+      if (currentMap === 'zhizhudong') {
+        // 蜘蛛洞：幽深洞窟，微光紫黑，四处张着银白蛛网与钟乳石笋。
+        const cave = ctx.createRadialGradient(
+          canvas.width / 2, canvas.height / 2, 80,
+          canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * .8);
+        cave.addColorStop(0, '#2c2136');
+        cave.addColorStop(.6, '#1d1526');
+        cave.addColorStop(1, '#0e0a14');
+        ctx.fillStyle = cave;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < 34; i++) {
+          const gx = seeded(i + 33000) * WORLD.w;
+          const gy = seeded(i + 33400) * WORLD.h;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -80 || sy < -80 || sx > canvas.width + 80 || sy > canvas.height + 80) continue;
+          ctx.fillStyle = `rgba(120,110,140,${0.1 + seeded(i) * 0.14})`;
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 10 + seeded(i + 1) * 26, 6 + seeded(i + 2) * 12, seeded(i + 3) * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        for (let i = 0; i < 10; i++) {
+          const gx = 200 + seeded(i + 34000) * (WORLD.w - 400);
+          const gy = 200 + seeded(i + 34400) * (WORLD.h - 400);
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -200 || sy < -200 || sx > canvas.width + 200 || sy > canvas.height + 200) continue;
+          const wr = 46 + seeded(i + 34500) * 60;
+          ctx.strokeStyle = 'rgba(230,230,245,0.28)';
+          ctx.lineWidth = 1.4;
+          for (let a = 0; a < 8; a++) {
+            const ang = a * Math.PI / 4 + seeded(i) * 0.6;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + Math.cos(ang) * wr, sy + Math.sin(ang) * wr);
+            ctx.stroke();
+          }
+          for (let ring = 1; ring <= 3; ring++) {
+            ctx.beginPath();
+            ctx.arc(sx, sy, wr * ring / 3.4, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+        for (let i = 0; i < 12; i++) {
+          const gx = seeded(i + 35000) * WORLD.w;
+          const gy = 120 + seeded(i + 35400) * 240;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -120 || sy < -160 || sx > canvas.width + 120 || sy > canvas.height + 160) continue;
+          ctx.fillStyle = 'rgba(70,60,88,0.8)';
+          ctx.beginPath();
+          ctx.moveTo(sx - 26, sy);
+          ctx.lineTo(sx, sy - 90 - seeded(i) * 60);
+          ctx.lineTo(sx + 26, sy);
+          ctx.closePath();
+          ctx.fill();
+        }
+        return;
+      }
+
       if (currentMap === 'renzhongdai') {
         // 人种袋内：血肉密室，暗红褶皱随帧数轻轻蠕动。
         const flesh = ctx.createRadialGradient(
@@ -3914,6 +4175,29 @@
     }
 
     function drawDecor() {
+      if (currentMap === 'zhizhudong') {
+        // 洞顶垂下的蛛丝，末端挂着露珠。
+        for (let i = 0; i < 14; i++) {
+          const gx = 160 + seeded(i + 36000) * (WORLD.w - 320);
+          const gy = 120 + seeded(i + 36400) * 500;
+          const sx = gx - camera.x;
+          const sy = gy - camera.y;
+          if (sx < -60 || sy < -200 || sx > canvas.width + 60 || sy > canvas.height + 200) continue;
+          const sway = Math.sin(frameCount * 0.02 + i) * 6;
+          const len = 60 + seeded(i + 36800) * 150;
+          ctx.strokeStyle = 'rgba(230,230,245,0.32)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + sway, sy + len);
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(230,230,245,0.5)';
+          ctx.beginPath();
+          ctx.arc(sx + sway, sy + len, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        return;
+      }
       if (currentMap === 'renzhongdai') {
         // 袋壁上的肉瘤与残渣白骨。
         for (let i = 0; i < 34; i++) {
@@ -5680,6 +5964,233 @@
       ctx.restore();
     }
 
+    // 猪八戒盟友：猪头僧衣大肚，扛着九齿钉耙（屏幕坐标绘制）。
+    function drawBajie(e, sx, sy) {
+      const u = 15;
+      const bob = Math.sin(frameCount * 0.07) * 1.6;
+      const windup = e.windupVis > 0;
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, u * 1.15, u * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 九齿钉耙（肩后扛起，挥击时前压）。
+      ctx.save();
+      ctx.rotate(windup ? -0.95 : -0.5);
+      ctx.strokeStyle = '#6e4a2a';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-u * 1.6, -u * 2.2);
+      ctx.lineTo(u * 1.9, -u * 0.6);
+      ctx.stroke();
+      ctx.strokeStyle = '#b8b8c8';
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(u * 1.7 + i * 3, -u * 0.9 - i * 2);
+        ctx.lineTo(u * 1.7 + i * 3 + 9, -u * 0.9 - i * 2 - 10);
+        ctx.stroke();
+      }
+      ctx.restore();
+      // 僧衣大肚。
+      ctx.fillStyle = '#4a5a7a';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.2, u * 0.95, u * 1.0, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e8c8a8';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.05, u * 0.6, u * 0.68, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 猪头：粉棕大耳、拱鼻。
+      ctx.fillStyle = '#c98d7a';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 2.6, u * 0.6, u * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#b87a68';
+      ctx.beginPath();
+      ctx.ellipse(-u * 0.5, -u * 2.9, u * 0.2, u * 0.32, -0.5, 0, Math.PI * 2);
+      ctx.ellipse(u * 0.5, -u * 2.9, u * 0.2, u * 0.32, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d89d8a';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 2.45, u * 0.24, u * 0.17, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5c2a20';
+      ctx.beginPath();
+      ctx.arc(-u * 0.07, -u * 2.45, u * 0.04, 0, Math.PI * 2);
+      ctx.arc(u * 0.07, -u * 2.45, u * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      // 战意眼神。
+      ctx.fillStyle = '#2a1812';
+      ctx.beginPath();
+      ctx.arc(-u * 0.22, -u * 2.68, u * 0.06, 0, Math.PI * 2);
+      ctx.arc(u * 0.22, -u * 2.68, u * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      // 名札。
+      ctx.fillStyle = '#e8d9a8';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('猪八戒', 0, -u * 3.5);
+      ctx.textAlign = 'left';
+      ctx.restore();
+    }
+
+    // 二姐：兰喜村妖姬，半血现出蜘蛛真身（原点为脚下）。
+    function drawErjie(e, sx, sy) {
+      const u = 13;
+      const bob = Math.sin(frameCount * 0.06 + e.bob) * 2;
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+      if (!e.spiderForm) {
+        // 人形：粉白长裙，云鬓高挑，手拈银丝。
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, u * 1.1, u * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        const skirt = ctx.createLinearGradient(0, -u * 2.6, 0, 0);
+        skirt.addColorStop(0, '#e8b8d8');
+        skirt.addColorStop(1, '#b87aa8');
+        ctx.fillStyle = skirt;
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.5, -u * 2.5);
+        ctx.quadraticCurveTo(-u * 1.1, -u * 1.2, -u * 1.0, 0);
+        ctx.lineTo(u * 1.0, 0);
+        ctx.quadraticCurveTo(u * 1.1, -u * 1.2, u * 0.5, -u * 2.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#d898c0';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 2.6, u * 0.52, u * 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#e8c8dc';
+        ctx.lineWidth = u * 0.2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.4, -u * 2.7);
+        ctx.lineTo(-u * 0.95, -u * 2.1);
+        ctx.moveTo(u * 0.4, -u * 2.7);
+        ctx.lineTo(u * 0.95, -u * 2.1);
+        ctx.stroke();
+        ctx.fillStyle = '#f2d8c8';
+        ctx.beginPath();
+        ctx.arc(0, -u * 3.5, u * 0.52, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#241820';
+        ctx.beginPath();
+        ctx.arc(0, -u * 3.72, u * 0.54, Math.PI, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, -u * 4.3, u * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#2a1420';
+        ctx.beginPath();
+        ctx.ellipse(-u * 0.2, -u * 3.45, u * 0.08, u * 0.05, -0.2, 0, Math.PI * 2);
+        ctx.ellipse(u * 0.2, -u * 3.45, u * 0.08, u * 0.05, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#c03858';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 3.24, u * 0.1, u * 0.05, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(235,235,250,0.7)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.95, -u * 2.1);
+        ctx.quadraticCurveTo(-u * 1.6, -u * 1.4, -u * 1.3, -u * 0.4);
+        ctx.moveTo(u * 0.95, -u * 2.1);
+        ctx.quadraticCurveTo(u * 1.6, -u * 1.4, u * 1.3, -u * 0.4);
+        ctx.stroke();
+      } else {
+        // 蜘蛛真身：紫黑圆腹、八足张开、复眼血红。
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, u * 1.9, u * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#3a2c48';
+        ctx.lineWidth = u * 0.16;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (const s of [-1, 1]) {
+          for (let i = 0; i < 4; i++) {
+            const ay = -u * (0.5 + i * 0.34);
+            const lift = Math.sin(frameCount * 0.12 + i * 1.7 + (s > 0 ? 0.9 : 0)) * u * 0.1;
+            ctx.moveTo(s * u * 0.7, ay);
+            ctx.quadraticCurveTo(s * u * 1.6, ay - u * 0.5, s * u * 2.1, ay + u * 0.45 + lift);
+          }
+        }
+        ctx.stroke();
+        const abd = ctx.createRadialGradient(-u * 0.3, -u * 1.5, u * 0.2, 0, -u * 1.2, u * 1.4);
+        abd.addColorStop(0, '#5a4470');
+        abd.addColorStop(1, '#2c2138');
+        ctx.fillStyle = abd;
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 1.2, u * 1.15, u * 0.95, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(200,160,220,0.5)';
+        ctx.lineWidth = u * 0.08;
+        ctx.beginPath();
+        ctx.arc(0, -u * 1.2, u * 0.7, Math.PI * 0.2, Math.PI * 0.8);
+        ctx.stroke();
+        ctx.fillStyle = '#3c2c4c';
+        ctx.beginPath();
+        ctx.ellipse(0, -u * 2.3, u * 0.62, u * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#241a30';
+        ctx.lineWidth = u * 0.1;
+        ctx.beginPath();
+        ctx.moveTo(-u * 0.2, -u * 2.6);
+        ctx.lineTo(-u * 0.34, -u * 3.0);
+        ctx.moveTo(u * 0.2, -u * 2.6);
+        ctx.lineTo(u * 0.34, -u * 3.0);
+        ctx.stroke();
+        ctx.fillStyle = '#ff4a58';
+        ctx.shadowColor = '#ff2a3a';
+        ctx.shadowBlur = 8;
+        for (const [ex, ey, er] of [[-0.28, -2.42, 0.1], [0.28, -2.42, 0.1], [-0.12, -2.56, 0.07], [0.12, -2.56, 0.07], [-0.4, -2.3, 0.06], [0.4, -2.3, 0.06]]) {
+          ctx.beginPath();
+          ctx.arc(u * ex, u * ey, u * er, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+    }
+
+    // 小蛛妖：蜘蛛洞中的寻常蛛妖（原点为脚下）。
+    function drawSpiderling(e, sx, sy) {
+      const u = e.radius;
+      const bob = Math.sin(frameCount * 0.1 + e.bob) * 1.5;
+      ctx.save();
+      ctx.translate(sx, sy + bob);
+      ctx.strokeStyle = '#3a3048';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (const s of [-1, 1]) {
+        for (let i = 0; i < 4; i++) {
+          const ay = -u * (0.35 + i * 0.22);
+          ctx.moveTo(s * u * 0.5, ay);
+          ctx.quadraticCurveTo(s * u * 1.1, ay - u * 0.3, s * u * 1.4, ay + u * 0.3);
+        }
+      }
+      ctx.stroke();
+      ctx.fillStyle = '#4a3c5c';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 0.8, u * 0.75, u * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#342a44';
+      ctx.beginPath();
+      ctx.ellipse(0, -u * 1.3, u * 0.42, u * 0.36, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ff5a4a';
+      ctx.beginPath();
+      ctx.arc(-u * 0.16, -u * 1.36, u * 0.07, 0, Math.PI * 2);
+      ctx.arc(u * 0.16, -u * 1.36, u * 0.07, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     // 蝜蝂：斯哈里国的巨甲虫（原点为腹部中心下方）。
     function drawFuban(e, sx, sy) {
       const u = e.radius * 1.2;
@@ -6868,11 +7379,13 @@
         else if (['buneng', 'bubai', 'bujing', 'bukong'].includes(e.type)) drawLeiyinMonk(e, 0, 0);
         else if (e.type === 'huangmeiboss') drawHuangmeiBoss(e, 0, 0);
         else if (e.type === 'macaque') drawMacaque(e, 0, 0);
+        else if (e.type === 'erjie') drawErjie(e, 0, 0);
         else drawBossBear(e, 0, 0);
       }
       else if (e.type === 'wolf') drawWolfChar(e, 0, 0);
       else if (e.type === 'snake') drawSnakeChar(e, 0, 0);
       else if (e.type === 'rat') drawRatChar(e, 0, 0);
+      else if (e.type === 'spiderling') drawSpiderling(e, 0, 0);
       else drawGolemChar(e, 0, 0);
       ctx.restore();
 
@@ -7714,7 +8227,9 @@
       if (ally) {
         drawList.push({
           y: ally.y,
-          draw: () => drawHuangfengBoss(ally, ally.x - camera.x, ally.y - camera.y)
+          draw: () => ally.kind === 'bajie'
+            ? drawBajie(ally, ally.x - camera.x, ally.y - camera.y)
+            : drawHuangfengBoss(ally, ally.x - camera.x, ally.y - camera.y)
         });
       }
       if (tudigong && introPhase !== 'walk') {
@@ -7746,7 +8261,7 @@
       while (!modalOpen && frameAccumulator >= FIXED_STEP) {
         frameCount++;
         updatePlayer(); updateStaff(); updateSkills(); updateEnemies(); updatePeaches();
-        updateBells(); updateAlly(); updateMonkeyClones(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai(); updateHuangmeiFight(); updateGust();
+        updateBells(); updateAlly(); updateMonkeyClones(); updatePigNpc(); updateIntro(); updateIcelake(); updateKuhai(); updateHuangmeiFight(); updateGust(); updateLanxi();
         updateProjectiles(); updateParticles(); updateSlashes(); updateDamageTexts();
         frameAccumulator -= FIXED_STEP;
       }
@@ -7759,7 +8274,7 @@
       gameRunning = false;
       overlayTitle.textContent = win ? '功德圆满' : '天命人陨落';
       overlayTitle.style.color = win ? '#ffd700' : '#e94560';
-      const CHECKPOINT_NAMES = { huangfeng: '黄风岭', icelake: '冰湖', futu: '浮屠界', kuhai: '苦海北岸', leiyin: '小雷音寺' };
+      const CHECKPOINT_NAMES = { huangfeng: '黄风岭', icelake: '冰湖', futu: '浮屠界', kuhai: '苦海北岸', leiyin: '小雷音寺', lanxi: '兰喜村', zhizhudong: '蜘蛛洞' };
       overlayMsg.textContent = win
         ? (progress.completedChapter3
           ? `黄眉已灭，三章俱破！真经在手，天下太平。最终得分: ${score}`
@@ -7806,6 +8321,24 @@
         overlay.style.display = 'none';
         setupLeiyin(checkpoint.bossIndex ?? progress.leiyinBossIndex ?? 0);
         banner = { text: '于小雷音寺存档点复活', timer: 140 };
+        gameRunning = true;
+        lastFrameTime = 0; frameAccumulator = 0;
+        gameLoop();
+        return;
+      }
+      if (checkpoint && checkpoint.map === 'lanxi' && currentMap === 'lanxi') {
+        overlay.style.display = 'none';
+        startChapter4Intro();
+        banner = { text: '于兰喜村存档点复活', timer: 140 };
+        gameRunning = true;
+        lastFrameTime = 0; frameAccumulator = 0;
+        gameLoop();
+        return;
+      }
+      if (checkpoint && checkpoint.map === 'zhizhudong' && currentMap === 'zhizhudong') {
+        overlay.style.display = 'none';
+        enterZhizhudong();
+        banner = { text: '于蜘蛛洞复活', timer: 140 };
         gameRunning = true;
         lastFrameTime = 0; frameAccumulator = 0;
         gameLoop();

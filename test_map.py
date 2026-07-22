@@ -46,7 +46,7 @@ with sync_playwright() as p:
     travel = page.eval_on_selector_all("#map-travel button", "els => els.map(e => ({t: e.textContent, dis: e.disabled}))")
     print("  神行按钮:", [(b["t"], b["dis"]) for b in travel])
     check("新存档神行全部禁用（黑风山为当前，其余未解锁）",
-          len(travel) == 4 and all(b["dis"] for b in travel), str(travel))
+          len(travel) == 5 and all(b["dis"] for b in travel), str(travel))
 
     # ---- 图内传送：点击地图 25%,25% 处 → 世界坐标约 (600,450) ----
     page.click("#map-box", position={"x": 160, "y": 120})  # box 宽 640 高 480
